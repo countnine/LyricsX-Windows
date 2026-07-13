@@ -4,13 +4,11 @@
 > 재개 방법: 세션 리셋 후 "이어서"라고 입력.
 
 ## ▶ 다음 세션 첫 작업
-- [ ] **M4 시작**: 번역 계층 — `TranslationService`(제공자 번역 → DeepL 폴백, 라인 캐시 SQLite 또는 JSON)
-  - AppSettings에 DeeplApiKey/TargetLanguage 필드 이미 존재 (기본 KO)
-  - DeepL API: POST https://api-free.deepl.com/v2/translate (free) / api.deepl.com (pro) — 키 형식으로 자동 판별(:fx 접미사 = free)
-  - 곡 단위 배치 번역(라인 배열 한 번에), 캐시 키 = (원문, target_lang)
-  - 이후: 설정 UI(트레이 → 설정 창, 키 입력/언어 선택/폰트 크기)
-- [ ] **사용자 육안 검증 대기**: 실제 음악(Spotify/YouTube Music 등)으로 오버레이 동기·클릭스루 확인.
-  데모: `LyricsX.exe --demo`로 언제든 오버레이 확인 가능
+- [ ] **DeepL 라이브 검증 대기(사용자)**: 트레이 → 설정…에 API 키 입력 후 외국어 곡 재생,
+  번역 라인이 한국어(MT)로 바뀌는지 확인. 캐시 동작: 같은 곡 재재생 시 즉시.
+- [ ] **M5 시작**: P1 — 수동 검색 창, LRC 로컬 저장/캐시(검색 자체 캐시), Windows 시작 시 자동 실행,
+  패키징(Velopack 또는 zip 배포), 앱 아이콘(SystemIcons.Application 교체)
+  - 성능: 가사 검색 자체의 SQLite/파일 캐시로 재생목록 반복 시 p50<300ms 달성
 
 ## 마일스톤 현황
 - [x] **M0** 스파이크 — 완료 (2026-07-13). 오버레이/렌더 스택 = **WPF 확정**
@@ -26,8 +24,12 @@
   - OutlinedTextElement DP화, OverlayWindow(이중언어 2단+카라오케 채움+이동 모드+위치 영속화)
   - 트레이 제어(토글/이동/오프셋±), --demo 모드, 스크린샷 검증 완료
   - 남김: 전체화면 감지(P1), 실음악 육안 검증(사용자)
-- [ ] M4 번역 계층(DeepL 폴백, target_lang 설정, 기본 KO) + 설정 패널
-- [ ] M5 P1 (수동 검색, 캐시, 자동 실행, 업데이트, 패키징 + QQ/Kugou)
+- [x] **M4** 번역 계층 + 설정 창 — 완료 (2026-07-13) = **P0(MVP) 코드 완성**
+  - DeeplTranslator(free/pro 자동 판별, 50개 배치), SqliteTranslationCache, LyricsTranslationService
+  - 표시 체인: tr:{target}(MT) → tr(제공자). 키 없으면 제공자 번역만(강등, PRD 정책)
+  - 설정 창(키/언어/폰트, 라이브 반영). 32 유닛 테스트 통과
+  - 남김: DeepL 실키 라이브 검증(사용자 키 필요)
+- [ ] M5 P1 (수동 검색, 검색 캐시, 자동 실행, 패키징, 아이콘 + QQ/Kugou)
 
 ## 기술 결정 기록
 - 오버레이/렌더 스택 = WPF (`OutlinedTextElement` + KaraokeProgress DP, Spike.Overlay 검증)
