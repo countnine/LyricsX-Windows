@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- UI 무관 코어: Windows 의존성 없이 테스트 가능해야 한다 -->
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>LyricsX.Core</RootNamespace>
+  </PropertyGroup>
+
+</Project>
