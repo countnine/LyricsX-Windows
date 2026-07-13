@@ -50,6 +50,26 @@ internal static class Program
             var offsetPlus = new MenuItem { Header = "가사 빠르게 (+0.5초)" };
             var offsetMinus = new MenuItem { Header = "가사 느리게 (-0.5초)" };
             var offsetReset = new MenuItem { Header = "오프셋 초기화" };
+            var startupToggle = new MenuItem
+            {
+                Header = "Windows 시작 시 자동 실행",
+                IsCheckable = true,
+                IsChecked = StartupManager.IsEnabled(),
+            };
+            startupToggle.Click += (_, _) =>
+            {
+                try
+                {
+                    StartupManager.SetEnabled(startupToggle.IsChecked);
+                }
+                catch (Exception e)
+                {
+                    Log.Write($"[startup] 설정 실패: {e.Message}");
+                    startupToggle.IsChecked = StartupManager.IsEnabled();
+                }
+            };
+            var searchItem = new MenuItem { Header = "가사 검색…" };
+            searchItem.Click += (_, _) => new SearchWindow(coordinator).Show();
             var settingsItem = new MenuItem { Header = "설정…" };
             var exitItem = new MenuItem { Header = "종료" };
 
@@ -98,6 +118,7 @@ internal static class Program
 
             var menu = new ContextMenu();
             menu.Items.Add(trackItem);
+            menu.Items.Add(searchItem);
             menu.Items.Add(new Separator());
             menu.Items.Add(overlayToggle);
             menu.Items.Add(moveToggle);
@@ -107,6 +128,7 @@ internal static class Program
             menu.Items.Add(offsetMinus);
             menu.Items.Add(offsetReset);
             menu.Items.Add(new Separator());
+            menu.Items.Add(startupToggle);
             menu.Items.Add(settingsItem);
             menu.Items.Add(exitItem);
 

@@ -10,6 +10,7 @@
     <RootNamespace>LyricsX.App</RootNamespace>
     <AssemblyName>LyricsX</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>assets\app.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>

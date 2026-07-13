@@ -11,6 +11,7 @@ publish/
 
 ## Build artifacts
 artifacts/
+!scripts/
 TestResults/
 *.nupkg
 
