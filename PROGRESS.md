@@ -4,11 +4,11 @@
 > 재개 방법: 세션 리셋 후 "이어서"라고 입력.
 
 ## ▶ 다음 세션 첫 작업
-- [ ] **DeepL 라이브 검증 대기(사용자)**: 트레이 → 설정…에 API 키 입력 후 외국어 곡 재생,
-  번역 라인이 한국어(MT)로 바뀌는지 확인. 캐시 동작: 같은 곡 재재생 시 즉시.
-- [ ] **M5 시작**: P1 — 수동 검색 창, LRC 로컬 저장/캐시(검색 자체 캐시), Windows 시작 시 자동 실행,
-  패키징(Velopack 또는 zip 배포), 앱 아이콘(SystemIcons.Application 교체)
-  - 성능: 가사 검색 자체의 SQLite/파일 캐시로 재생목록 반복 시 p50<300ms 달성
+- [ ] **M5-U2**: Windows 시작 시 자동 실행 — HKCU\...\CurrentVersion\Run 레지스트리 토글(트레이 체크 메뉴)
+  + 멀티사이즈 .ico 생성해 <ApplicationIcon> 설정 (현재 exe 아이콘 없음, 트레이는 런타임 그림)
+- [ ] **M5-U3**: 수동 가사 검색 창 — 현재 곡 프리필 → SearchAllAsync 목록(서비스/q/번역) →
+  선택 시 `coordinator.UseLyricsAsync(lyrics)` (이미 구현돼 있음)
+- [ ] **M5-U4**: 패키징 — publish 스크립트(win-x64 self-contained), zip, README
 
 ## 마일스톤 현황
 - [x] **M0** 스파이크 — 완료 (2026-07-13). 오버레이/렌더 스택 = **WPF 확정**
@@ -29,7 +29,12 @@
   - 표시 체인: tr:{target}(MT) → tr(제공자). 키 없으면 제공자 번역만(강등, PRD 정책)
   - 설정 창(키/언어/폰트, 라이브 반영). 32 유닛 테스트 통과
   - 남김: DeepL 실키 라이브 검증(사용자 키 필요)
-- [ ] M5 P1 (수동 검색, 검색 캐시, 자동 실행, 패키징, 아이콘 + QQ/Kugou)
+- [~] **M5** P1 진행 중
+  - [x] U1 가사 캐시: 재시작 시 <100ms 캐시 표시 검증. 번역 포함 저장 → 오프라인 동작
+  - [x] (M4 추가) 트레이 아이콘 가시화: 런타임 녹색 L + ForceCreate — 사용자 검증 완료
+  - [x] DeepL 라이브 검증 — 사용자 확인 완료 ("번역 잘 작동")
+  - [ ] U2 자동 실행 + .ico / U3 수동 검색 창 / U4 패키징 ← 다음
+  - [ ] (선택) QQ/Kugou 제공자
 
 ## 기술 결정 기록
 - 오버레이/렌더 스택 = WPF (`OutlinedTextElement` + KaraokeProgress DP, Spike.Overlay 검증)
