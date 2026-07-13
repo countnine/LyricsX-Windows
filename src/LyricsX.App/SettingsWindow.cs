@@ -35,8 +35,57 @@ public sealed class SettingsWindow : Window
             Text = "텍스트 크기는 오버레이 크기에 맞춰 자동 조절됩니다.\n(오버레이에 마우스를 올려 🔒 클릭 → 이동/크기 조절 모드)",
             Opacity = 0.7,
             TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 4, 0, 0),
+            Margin = new Thickness(0, 4, 0, 12),
         };
+
+        // ---- 오버레이 스타일 ----
+        (TextBox Box, Border Preview, StackPanel Row) MakeColorRow(string label, string value)
+        {
+            var box = new TextBox { Text = value, Width = 90, Margin = new Thickness(8, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center };
+            var preview = new Border
+            {
+                Width = 20, Height = 20,
+                CornerRadius = new CornerRadius(4),
+                BorderBrush = System.Windows.Media.Brushes.Gray,
+                BorderThickness = new Thickness(1),
+                VerticalAlignment = VerticalAlignment.Center,
+            };
+            void UpdatePreview()
+            {
+                try
+                {
+                    preview.Background = new System.Windows.Media.SolidColorBrush(
+                        (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(box.Text.Trim()));
+                }
+                catch
+                {
+                    preview.Background = System.Windows.Media.Brushes.Transparent;
+                }
+            }
+            box.TextChanged += (_, _) => UpdatePreview();
+            UpdatePreview();
+
+            var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 3, 0, 3) };
+            row.Children.Add(new TextBlock { Text = label, Width = 110, VerticalAlignment = VerticalAlignment.Center });
+            row.Children.Add(box);
+            row.Children.Add(preview);
+            return (box, preview, row);
+        }
+
+        var textColor = MakeColorRow("원문 색", settings.TextColor);
+        var karaokeColor = MakeColorRow("카라오케 진행 색", settings.KaraokeColor);
+        var translationColor = MakeColorRow("번역 색", settings.TranslationColor);
+        var outlineColor = MakeColorRow("외곽선 색", settings.OutlineColor);
+
+        var outlineLabel = new TextBlock { Margin = new Thickness(0, 6, 0, 0) };
+        var outlineSlider = new Slider
+        {
+            Minimum = 0, Maximum = 8, Value = settings.OutlineThickness,
+            TickFrequency = 0.5, IsSnapToTickEnabled = true,
+        };
+        void UpdateOutlineLabel() => outlineLabel.Text = $"외곽선 두께: {outlineSlider.Value:0.#}";
+        outlineSlider.ValueChanged += (_, _) => UpdateOutlineLabel();
+        UpdateOutlineLabel();
 
         var saveButton = new Button
         {
@@ -46,10 +95,29 @@ public sealed class SettingsWindow : Window
             HorizontalAlignment = HorizontalAlignment.Right,
             Margin = new Thickness(0, 14, 0, 0),
         };
+        static string NormalizeHex(string input, string fallback)
+        {
+            var t = input.Trim();
+            try
+            {
+                _ = System.Windows.Media.ColorConverter.ConvertFromString(t);
+                return t;
+            }
+            catch
+            {
+                return fallback;
+            }
+        }
+
         saveButton.Click += (_, _) =>
         {
             settings.DeeplApiKey = string.IsNullOrWhiteSpace(apiKeyBox.Text) ? null : apiKeyBox.Text.Trim();
             settings.TargetLanguage = string.IsNullOrWhiteSpace(langBox.Text) ? "KO" : langBox.Text.Trim().ToUpperInvariant();
+            settings.TextColor = NormalizeHex(textColor.Box.Text, settings.TextColor);
+            settings.KaraokeColor = NormalizeHex(karaokeColor.Box.Text, settings.KaraokeColor);
+            settings.TranslationColor = NormalizeHex(translationColor.Box.Text, settings.TranslationColor);
+            settings.OutlineColor = NormalizeHex(outlineColor.Box.Text, settings.OutlineColor);
+            settings.OutlineThickness = outlineSlider.Value;
             settings.Save();
             onSaved();
             Close();
@@ -69,6 +137,13 @@ public sealed class SettingsWindow : Window
         });
         panel.Children.Add(langBox);
         panel.Children.Add(fontHint);
+        panel.Children.Add(new TextBlock { Text = "오버레이 스타일", FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 4, 0, 4) });
+        panel.Children.Add(textColor.Row);
+        panel.Children.Add(karaokeColor.Row);
+        panel.Children.Add(translationColor.Row);
+        panel.Children.Add(outlineColor.Row);
+        panel.Children.Add(outlineLabel);
+        panel.Children.Add(outlineSlider);
         panel.Children.Add(saveButton);
         Content = panel;
     }

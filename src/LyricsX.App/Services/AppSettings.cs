@@ -18,6 +18,13 @@ public sealed class AppSettings
     public double OverlayWidth { get; set; } = 780;
     public double OverlayHeight { get; set; } = 150;
 
+    // ---- 오버레이 스타일 (#RRGGBB) ----
+    public string TextColor { get; set; } = "#FFFFFF";
+    public string KaraokeColor { get; set; } = "#1DB954";
+    public string TranslationColor { get; set; } = "#E8E8E8";
+    public string OutlineColor { get; set; } = "#000000";
+    public double OutlineThickness { get; set; } = 3.0;
+
     /// <summary>수동 싱크 오프셋(초). +면 가사가 빨라진다.</summary>
     public double ManualOffsetSeconds { get; set; }
 

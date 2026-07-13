@@ -31,6 +31,7 @@ public sealed class OverlayWindow : Window
     private bool _clickThrough = true;
     private bool _userVisible = true;
     private bool _fullscreenSuppressed;
+    private bool _pausedSuppressed;
 
     /// <summary>이동 모드 여부 (true = 드래그 이동/크기 조절 가능)</summary>
     public bool IsMoveMode => !_clickThrough;
@@ -56,16 +57,14 @@ public sealed class OverlayWindow : Window
 
         _originalLine = new OutlinedTextElement
         {
-            Fill = Brushes.White,
-            KaraokeFill = new SolidColorBrush(Color.FromRgb(0x1D, 0xB9, 0x54)),
             HorizontalAlignment = HorizontalAlignment.Center,
         };
         _translationLine = new OutlinedTextElement
         {
-            Fill = new SolidColorBrush(Color.FromRgb(0xE8, 0xE8, 0xE8)),
             HorizontalAlignment = HorizontalAlignment.Center,
             Margin = new Thickness(0, 4, 0, 0),
         };
+        ApplyStyle();
         _panel = new StackPanel
         {
             Orientation = Orientation.Vertical,
@@ -170,6 +169,7 @@ public sealed class OverlayWindow : Window
         _lockButton.SetLocked(!moveMode);
         if (!moveMode) SaveBounds();
         MoveModeChanged?.Invoke(moveMode);
+        ApplyVisibility(); // 억제 상태여도 이동 모드 진입 시 표시
         UpdateLockButton();
     }
 
@@ -217,14 +217,23 @@ public sealed class OverlayWindow : Window
 
     public void SetFullscreenSuppressed(bool suppressed)
     {
-        // 이동 모드 중에는 억제하지 않음 (사용자가 조작 중)
-        _fullscreenSuppressed = suppressed && !IsMoveMode;
+        _fullscreenSuppressed = suppressed;
+        ApplyVisibility();
+    }
+
+    /// <summary>재생 일시정지 중 오버레이 숨김</summary>
+    public void SetPausedSuppressed(bool suppressed)
+    {
+        _pausedSuppressed = suppressed;
         ApplyVisibility();
     }
 
     private void ApplyVisibility()
     {
-        if (_userVisible && !_fullscreenSuppressed)
+        // 이동 모드 중에는 억제(전체화면/일시정지)를 무시 — 사용자가 조작 중
+        var visible = _userVisible
+            && (IsMoveMode || (!_fullscreenSuppressed && !_pausedSuppressed));
+        if (visible)
         {
             Show();
         }
@@ -233,6 +242,42 @@ public sealed class OverlayWindow : Window
             Hide();
             _lockButton.Hide();
         }
+    }
+
+    /// <summary>설정의 색상/외곽선 스타일 적용 (설정 저장 후에도 호출)</summary>
+    public void ApplyStyle()
+    {
+        _originalLine.Fill = ParseBrush(_settings.TextColor, Colors.White);
+        _originalLine.KaraokeFill = ParseBrush(_settings.KaraokeColor, Color.FromRgb(0x1D, 0xB9, 0x54));
+        _translationLine.Fill = ParseBrush(_settings.TranslationColor, Color.FromRgb(0xE8, 0xE8, 0xE8));
+
+        var outline = ParseBrush(_settings.OutlineColor, Colors.Black, alpha: 0xE0);
+        var thickness = Math.Clamp(_settings.OutlineThickness, 0, 8);
+        _originalLine.Stroke = outline;
+        _originalLine.StrokeThickness = thickness;
+        _translationLine.Stroke = outline;
+        _translationLine.StrokeThickness = thickness;
+
+        _originalLine.InvalidateVisual();
+        _translationLine.InvalidateVisual();
+        if (IsLoaded) UpdateTextLayout(); // 외곽선 두께가 측정 크기에 영향
+    }
+
+    private static SolidColorBrush ParseBrush(string hex, Color fallback, byte? alpha = null)
+    {
+        Color color;
+        try
+        {
+            color = (Color)ColorConverter.ConvertFromString(hex);
+        }
+        catch
+        {
+            color = fallback;
+        }
+        if (alpha is { } a) color.A = a;
+        var brush = new SolidColorBrush(color);
+        brush.Freeze();
+        return brush;
     }
 
     // ---- 위치/크기 영속화 ----

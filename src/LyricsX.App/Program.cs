@@ -50,6 +50,14 @@ internal static class Program
                 Log.Write($"[fullscreen] {(full ? "감지 → 오버레이 숨김" : "해제 → 오버레이 복원")}");
             };
 
+            // 일시정지 중 오버레이 자동 숨김 (--demo에서는 재생 상태가 없으므로 제외)
+            if (!args.Contains("--demo"))
+            {
+                overlay.SetPausedSuppressed(!nowPlaying.IsPlaying);
+                nowPlaying.IsPlayingChanged += playing =>
+                    app.Dispatcher.BeginInvoke(() => overlay.SetPausedSuppressed(!playing));
+            }
+
             // ---- 트레이 메뉴 ----
             var trackItem = new MenuItem { Header = "재생 중인 곡 없음", IsEnabled = false };
             var overlayToggle = new MenuItem { Header = "오버레이 표시", IsCheckable = true, IsChecked = settings.OverlayVisible };
@@ -93,6 +101,7 @@ internal static class Program
                 {
                     coordinator.Translation = BuildTranslation();
                     coordinator.TargetLanguage = settings.EffectiveTargetLanguage;
+                    overlay.ApplyStyle();
                     Log.Write($"[settings] 저장됨: lang={settings.EffectiveTargetLanguage}, key={(settings.DeeplApiKey is null ? "없음" : "설정됨")}");
                 });
                 settingsWindow.Show();
