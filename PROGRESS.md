@@ -1,7 +1,12 @@
 # PROGRESS — LyricsX for Windows
 
-> **상태: v0.2.0 (2026-07-13)** — MVP 완성 + 오버레이 UX 개선판
+> **상태: v0.3.0 (2026-07-13)** — MVP + 오버레이 UX/스타일 완성판
 > 재개 방법: "이어서"라고 입력하면 아래 백로그부터 진행.
+
+## v0.3.0 추가분
+- 일시정지/정지 중 오버레이 자동 숨김 (재생 재개 시 복원, 이동 모드 중엔 유지, --demo 제외)
+- 오버레이 스타일 설정: 원문/카라오케/번역/외곽선 색(hex+미리보기) + 외곽선 두께 — 저장 즉시 반영
+- v0.2.1: 이동 모드 드래그 후 자물쇠 재클릭 불능 수정 (자물쇠를 소유 창으로 — z-순서 보장)
 
 ## v0.2.0 추가분
 - 전체화면 앱 감지 시 오버레이 자동 숨김 (`FullscreenDetector`, 1s 폴링, 이동 모드 중엔 억제 안 함)
@@ -22,8 +27,7 @@
 1. **QQ Music/Kugou 제공자** — 중국 곡 커버리지 확대 (KRC/QRC 복호화 포팅, `external/LyricsKit/Sources/LyricsService/Parser/` 참조)
 2. **글자 단위 카라오케** — NetEase yrc/klyric 파싱 + InlineTimeTags 기반 채움 (현재는 라인 단위 진행률)
 3. **자동 업데이트** — Velopack + GitHub Releases
-4. **오버레이 스타일 설정** — 색상/외곽선/카라오케 색 커스터마이즈 UI
-5. 검색 실패 시 재시도/트랙 메타 정제(feat. 표기 제거 등) 플러그인 (원본 LyricsSearchRequestPlugin 상당)
+4. 검색 실패 시 재시도/트랙 메타 정제(feat. 표기 제거 등) 플러그인 (원본 LyricsSearchRequestPlugin 상당)
 
 ## 기술 결정 기록
 - 스택: WPF 단일 (WinUI3/DirectWrite 불필요 판정 — M0 검증)
