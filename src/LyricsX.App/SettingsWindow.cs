@@ -30,26 +30,13 @@ public sealed class SettingsWindow : Window
             Margin = new Thickness(0, 2, 0, 10),
         };
 
-        var fontLabel = new TextBlock();
-        var fontSlider = new Slider
+        var fontHint = new TextBlock
         {
-            Minimum = 20, Maximum = 72, Value = settings.FontSize,
-            TickFrequency = 2, IsSnapToTickEnabled = true,
+            Text = "텍스트 크기는 오버레이 크기에 맞춰 자동 조절됩니다.\n(오버레이에 마우스를 올려 🔒 클릭 → 이동/크기 조절 모드)",
+            Opacity = 0.7,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 4, 0, 0),
         };
-        var trFontLabel = new TextBlock { Margin = new Thickness(0, 6, 0, 0) };
-        var trFontSlider = new Slider
-        {
-            Minimum = 14, Maximum = 48, Value = settings.TranslationFontSize,
-            TickFrequency = 2, IsSnapToTickEnabled = true,
-        };
-        void UpdateFontLabels()
-        {
-            fontLabel.Text = $"원문 폰트 크기: {fontSlider.Value:0}";
-            trFontLabel.Text = $"번역 폰트 크기: {trFontSlider.Value:0}";
-        }
-        fontSlider.ValueChanged += (_, _) => UpdateFontLabels();
-        trFontSlider.ValueChanged += (_, _) => UpdateFontLabels();
-        UpdateFontLabels();
 
         var saveButton = new Button
         {
@@ -63,8 +50,6 @@ public sealed class SettingsWindow : Window
         {
             settings.DeeplApiKey = string.IsNullOrWhiteSpace(apiKeyBox.Text) ? null : apiKeyBox.Text.Trim();
             settings.TargetLanguage = string.IsNullOrWhiteSpace(langBox.Text) ? "KO" : langBox.Text.Trim().ToUpperInvariant();
-            settings.FontSize = fontSlider.Value;
-            settings.TranslationFontSize = trFontSlider.Value;
             settings.Save();
             onSaved();
             Close();
@@ -83,10 +68,7 @@ public sealed class SettingsWindow : Window
             FontWeight = FontWeights.SemiBold,
         });
         panel.Children.Add(langBox);
-        panel.Children.Add(fontLabel);
-        panel.Children.Add(fontSlider);
-        panel.Children.Add(trFontLabel);
-        panel.Children.Add(trFontSlider);
+        panel.Children.Add(fontHint);
         panel.Children.Add(saveButton);
         Content = panel;
     }

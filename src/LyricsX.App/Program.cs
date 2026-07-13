@@ -40,7 +40,15 @@ internal static class Program
             };
 
             var overlay = new OverlayWindow(settings);
-            if (settings.OverlayVisible) overlay.Show();
+            overlay.SetUserVisible(settings.OverlayVisible);
+
+            // 전체화면 앱(게임/영상) 활성 시 오버레이 자동 숨김
+            var fullscreenDetector = new FullscreenDetector(app.Dispatcher);
+            fullscreenDetector.FullscreenChanged += full =>
+            {
+                overlay.SetFullscreenSuppressed(full);
+                Log.Write($"[fullscreen] {(full ? "감지 → 오버레이 숨김" : "해제 → 오버레이 복원")}");
+            };
 
             // ---- 트레이 메뉴 ----
             var trackItem = new MenuItem { Header = "재생 중인 곡 없음", IsEnabled = false };
@@ -85,7 +93,6 @@ internal static class Program
                 {
                     coordinator.Translation = BuildTranslation();
                     coordinator.TargetLanguage = settings.EffectiveTargetLanguage;
-                    overlay.ApplyFontSizes();
                     Log.Write($"[settings] 저장됨: lang={settings.EffectiveTargetLanguage}, key={(settings.DeeplApiKey is null ? "없음" : "설정됨")}");
                 });
                 settingsWindow.Show();
@@ -98,11 +105,11 @@ internal static class Program
             overlayToggle.Click += (_, _) =>
             {
                 settings.OverlayVisible = overlayToggle.IsChecked;
-                if (overlayToggle.IsChecked) overlay.Show();
-                else overlay.Hide();
+                overlay.SetUserVisible(overlayToggle.IsChecked);
                 settings.Save();
             };
             moveToggle.Click += (_, _) => overlay.SetMoveMode(moveToggle.IsChecked);
+            overlay.MoveModeChanged += moveMode => moveToggle.IsChecked = moveMode; // 자물쇠 버튼과 동기화
             offsetPlus.Click += (_, _) => AdjustOffset(0.5);
             offsetMinus.Click += (_, _) => AdjustOffset(-0.5);
             offsetReset.Click += (_, _) => AdjustOffset(null);
@@ -171,7 +178,7 @@ internal static class Program
             // --demo: 내장 데모 가사를 3초 주기로 순환 (오버레이 검증/시연용, SMTC 불필요)
             if (args.Contains("--demo"))
             {
-                overlay.Show();
+                overlay.SetUserVisible(true);
                 var demoLines = new (string Content, string Translation)[]
                 {
                     ("沈むように溶けてゆくように", "가라앉듯이 녹아내리듯이"),

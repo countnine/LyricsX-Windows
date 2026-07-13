@@ -13,8 +13,10 @@ public sealed class AppSettings
     public bool OverlayVisible { get; set; } = true;
     public double? OverlayX { get; set; }
     public double? OverlayY { get; set; }
-    public double FontSize { get; set; } = 40;
-    public double TranslationFontSize { get; set; } = 26;
+
+    /// <summary>오버레이 크기. 텍스트 크기는 높이에 비례해 자동 결정된다.</summary>
+    public double OverlayWidth { get; set; } = 780;
+    public double OverlayHeight { get; set; } = 150;
 
     /// <summary>수동 싱크 오프셋(초). +면 가사가 빨라진다.</summary>
     public double ManualOffsetSeconds { get; set; }
