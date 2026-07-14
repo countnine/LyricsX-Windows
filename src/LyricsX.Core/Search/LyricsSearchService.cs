@@ -16,7 +16,7 @@ public sealed class LyricsSearchService
     {
         _providers = providers.Length > 0
             ? providers
-            : [new LrclibProvider(), new NetEaseProvider()];
+            : [new LrclibProvider(), new NetEaseProvider(), new KugouProvider(), new QQMusicProvider()];
     }
 
     /// <summary>모든 제공자 결과를 도착 순으로 스트리밍 (제공자 간 순서 비보장)</summary>

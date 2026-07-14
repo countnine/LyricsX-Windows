@@ -35,6 +35,18 @@ internal static partial class LrcRegex
     [GeneratedRegex(@"<(\d+)>")]
     public static partial Regex InlineDuration();
 
+    /// <summary>KRC/QRC 가사 라인: [startMs,durationMs]본문</summary>
+    [GeneratedRegex(@"^\[(\d+),(\d+)\](.*)", RegexOptions.Multiline)]
+    public static partial Regex KrcLine();
+
+    /// <summary>Kugou 글자단위 인라인 태그 &lt;relStartMs,durationMs,0&gt;fragment</summary>
+    [GeneratedRegex(@"<(\d+),(\d+),0>([^<]*)")]
+    public static partial Regex KugouInlineTag();
+
+    /// <summary>QQ 글자단위 인라인 태그 fragment(absStartMs,durationMs) — fragment는 비탐욕</summary>
+    [GeneratedRegex(@"(.*?)\((\d+),(\d+)\)")]
+    public static partial Regex QqInlineTag();
+
     /// <summary>타임태그 문자열에서 초 단위 위치 목록을 해석한다.</summary>
     public static List<double> ResolveTimeTags(string str)
     {
