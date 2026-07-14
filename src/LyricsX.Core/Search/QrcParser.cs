@@ -51,6 +51,7 @@ internal static class QrcParser
         if (lyrics.Lines.Count == 0) return null;
 
         foreach (var (k, v) in idTags) lyrics.IdTags[k] = v;
+        lyrics.Metadata.AttachmentTags = new HashSet<string> { LineAttachments.TagTimeTag };
         return lyrics;
     }
 }

@@ -60,6 +60,7 @@ internal static class KrcParser
         if (lyrics.Lines.Count == 0) return null;
 
         foreach (var (k, v) in idTags) lyrics.IdTags[k] = v;
+        lyrics.Metadata.AttachmentTags = new HashSet<string> { LineAttachments.TagTimeTag };
 
         // type == 1: 번역, type == 0: 발음(로마자). 번역만 첨부한다.
         var trans = languageHeader?.Content?.FirstOrDefault(c => c.Type == 1);

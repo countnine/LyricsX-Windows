@@ -82,7 +82,8 @@ public sealed partial class NetEaseProvider : LyricsProviderBase<NetEaseProvider
         var response = JsonSerializer.Deserialize<LyricsResponse>(raw, JsonOptions);
         if (response is null) return null;
 
-        var lyrics = ParseFixed(response.Lrc?.Lyric);
+        // 글자 단위(yrc 신형 → klyric 구형) 우선, 없으면 라인 단위 lrc
+        var lyrics = ParseWordLevel(response) ?? ParseFixed(response.Lrc?.Lyric);
         if (lyrics is null) return null;
 
         var translation = ParseFixed(response.Tlyric?.Lyric);
@@ -105,6 +106,20 @@ public sealed partial class NetEaseProvider : LyricsProviderBase<NetEaseProvider
     /// <summary>NetEase 특유의 [mm:ss:xx] 타임태그를 [mm:ss.xx]로 교정 후 파싱</summary>
     private static Lyrics? ParseFixed(string? lrc) =>
         string.IsNullOrEmpty(lrc) ? null : Lyrics.Parse(TimeTagFixer().Replace(lrc, "$1.$2"));
+
+    /// <summary>글자 단위 가사(yrc/klyric) 파싱. 유효 라인이 없으면 null.</summary>
+    private static Lyrics? ParseWordLevel(LyricsResponse response)
+    {
+        if (!string.IsNullOrEmpty(response.Yrc?.Lyric) &&
+            NetEaseLyricParser.ParseYrc(response.Yrc.Lyric) is { } yrc)
+            return yrc;
+
+        if (!string.IsNullOrEmpty(response.Klyric?.Lyric) &&
+            NetEaseLyricParser.ParseKLyric(response.Klyric.Lyric) is { } klyric)
+            return klyric;
+
+        return null;
+    }
 
     [GeneratedRegex(@"(\[\d+:\d+):(\d+\])")]
     private static partial Regex TimeTagFixer();

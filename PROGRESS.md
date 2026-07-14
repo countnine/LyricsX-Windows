@@ -1,7 +1,13 @@
 # PROGRESS — LyricsX for Windows
 
-> **상태: v0.5.0 (2026-07-14)** — 글자 단위 카라오케
+> **상태: v0.5.1 (2026-07-14)** — NetEase yrc/klyric 글자 단위 파싱
 > 재개 방법: "이어서"라고 입력하면 아래 백로그부터 진행.
+
+## v0.5.1 추가분
+- **NetEase yrc/klyric 파싱** — `NetEaseLyricParser`(ParseYrc/ParseKLyric). FetchAsync가 yrc(신형 단어단위) → klyric(구형) → lrc 순으로 우선. 글자 단위 카라오케(v0.5.0)가 NetEase 곡에도 적용됨
+  - yrc: `(absStartMs,durMs,0)fragment`, klyric: `(0,durMs)fragment[(0,1) ]`(지속시간 누적)
+  - 인라인 파서 3종(Kugou/QQ/NetEase) 모두 `tt`를 `AttachmentTags`에 등록 → 품질 랭킹 `InlineTimeTagBonus` 적용(단어단위 가사 우대)
+  - 신규 테스트 3종(전체 46 통과)
 
 ## v0.5.0 추가분
 - **글자 단위 카라오케** — 인라인 타임태그(`tt`)가 있는 라인은 글자 위치까지 정확히 채움, 없으면 기존 라인 단위 폴백
@@ -40,10 +46,10 @@
 - 배포: `artifacts\LyricsX-Windows-v0.1.0-win-x64.zip` (70MB, self-contained 단일 exe)
 
 ## 백로그 (다음 작업 후보, 우선순위 순)
-1. **NetEase yrc/klyric 파싱** — 글자단위 타임태그 소스 확대. NetEaseProvider가 lrc+tlyric만 파싱 중, yrc/klyric 응답 필드는 이미 수신(백로그 완료 시 v0.5.0 글자 카라오케에 자동 연결)
-2. **자동 업데이트** — Velopack + GitHub Releases
-3. 검색 실패 시 재시도/트랙 메타 정제(feat. 표기 제거 등) 플러그인 (원본 LyricsSearchRequestPlugin 상당)
-4. **QQ Music 실응답 검증** — lyric_download.fcg XML 스키마/필드를 실제 응답으로 확인·튜닝 (현재 방어적 추정 구현)
+1. **자동 업데이트** — Velopack + GitHub Releases
+2. 검색 실패 시 재시도/트랙 메타 정제(feat. 표기 제거 등) 플러그인 (원본 LyricsSearchRequestPlugin 상당)
+3. **QQ Music 실응답 검증** — lyric_download.fcg XML 스키마/필드를 실제 응답으로 확인·튜닝 (현재 방어적 추정 구현)
+4. **실검색 통합 검증** — Kugou/QQ/NetEase(yrc/klyric) 실제 곡으로 글자 카라오케 표시 확인 (오프라인 검증분 보완)
 
 ## 기술 결정 기록
 - 스택: WPF 단일 (WinUI3/DirectWrite 불필요 판정 — M0 검증)

@@ -47,6 +47,14 @@ internal static partial class LrcRegex
     [GeneratedRegex(@"(.*?)\((\d+),(\d+)\)")]
     public static partial Regex QqInlineTag();
 
+    /// <summary>NetEase yrc 인라인 태그 (absStartMs,durationMs,0)fragment</summary>
+    [GeneratedRegex(@"\((\d+),(\d+),0\)([^(]*)")]
+    public static partial Regex NetEaseYrcInlineTag();
+
+    /// <summary>NetEase klyric 인라인 태그 (0,durationMs)fragment[(0,1) ] — 마지막은 선택적 공백 삽입</summary>
+    [GeneratedRegex(@"\(0,(\d+)\)([^(]+)(\(0,1\) )?")]
+    public static partial Regex NetEaseKLyricInlineTag();
+
     /// <summary>타임태그 문자열에서 초 단위 위치 목록을 해석한다.</summary>
     public static List<double> ResolveTimeTags(string str)
     {
