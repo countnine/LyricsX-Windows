@@ -1,3 +1,4 @@
+using System.Threading;
 using Windows.Media.Control;
 
 using SessionManager = Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager;
@@ -22,6 +23,12 @@ public sealed class NowPlayingService : IDisposable
     private SessionManager? _manager;
     private Session? _session;
     private readonly object _lock = new();
+    private Timer? _pollTimer;
+
+    // 위치 떨림 완화용 상태 (같은 곡 재생 중 작은 역행 흡수)
+    private TimeSpan _smoothedPosition = TimeSpan.MinValue;
+    private string? _smoothedTrackKey;
+    private static readonly TimeSpan BackwardTolerance = TimeSpan.FromSeconds(1.0);
 
     public TrackInfo? CurrentTrack { get; private set; }
     public bool IsPlaying { get; private set; }
@@ -35,6 +42,12 @@ public sealed class NowPlayingService : IDisposable
         service._manager = await SessionManager.RequestAsync();
         service._manager.CurrentSessionChanged += (_, _) => service.AttachCurrentSession();
         service.AttachCurrentSession();
+
+        // SMTC의 PlaybackInfoChanged 이벤트가 앱(예: Spotify)에 따라 지연되어
+        // 정지 후에도 가사가 남는 문제 방지 — 재생 상태를 주기적으로 폴링해 즉시 반영.
+        service._pollTimer = new Timer(
+            _ => service.RefreshPlayback(), null,
+            TimeSpan.FromMilliseconds(250), TimeSpan.FromMilliseconds(250));
         return service;
     }
 
@@ -119,6 +132,8 @@ public sealed class NowPlayingService : IDisposable
     /// <summary>
     /// 보간된 현재 재생 위치. SMTC 타임라인은 앱별로 갱신이 드물어
     /// LastUpdatedTime 이후 경과분을 더한다 (Spike.Smtc에서 검증).
+    /// 새 타임라인 갱신 때 값이 뒤로 튀는 떨림(특히 Apple Music)을 막기 위해
+    /// 같은 곡 재생 중 1초 미만의 역행은 흡수한다(큰 변화=시킹은 그대로 반영).
     /// </summary>
     public TimeSpan? GetEstimatedPosition()
     {
@@ -126,26 +141,40 @@ public sealed class NowPlayingService : IDisposable
         lock (_lock) session = _session;
         if (session is null) return null;
 
+        TimeSpan position;
+        bool playing = IsPlaying;
         try
         {
             var timeline = session.GetTimelineProperties();
-            var position = timeline.Position;
-            if (IsPlaying)
+            position = timeline.Position;
+            if (playing)
             {
                 var elapsed = DateTimeOffset.Now - timeline.LastUpdatedTime;
                 if (elapsed > TimeSpan.Zero && elapsed < TimeSpan.FromMinutes(30))
                     position += elapsed;
             }
-            return position;
         }
         catch
         {
             return null;
         }
+
+        var trackKey = CurrentTrack is { } t ? $"{t.Title}|{t.Artist}" : null;
+        if (playing && trackKey == _smoothedTrackKey && _smoothedPosition != TimeSpan.MinValue)
+        {
+            var delta = position - _smoothedPosition;
+            if (delta < TimeSpan.Zero && delta > -BackwardTolerance)
+                position = _smoothedPosition; // 작은 역행은 유지
+        }
+        _smoothedPosition = position;
+        _smoothedTrackKey = trackKey;
+        return position;
     }
 
     public void Dispose()
     {
+        _pollTimer?.Dispose();
+        _pollTimer = null;
         lock (_lock)
         {
             if (_session is not null)

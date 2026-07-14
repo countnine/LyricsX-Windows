@@ -123,8 +123,15 @@ public sealed class OverlayWindow : Window
         _originalLine.InlineKaraoke = _karaoke;
         _originalLine.KaraokeProgress = 0;
         _originalLine.KaraokeTime = 0;
-        _translationLine.Text = line?.Translation ?? string.Empty;
-        _translationLine.Visibility = string.IsNullOrEmpty(line?.Translation)
+
+        // 옵션: 번역이 원문과 같으면 번역 줄을 숨겨 원문만 표시
+        var translation = line?.Translation;
+        if (_settings.HideSameTranslation && translation is not null && line?.Content is { } content
+            && string.Equals(translation.Trim(), content.Trim(), StringComparison.OrdinalIgnoreCase))
+            translation = null;
+
+        _translationLine.Text = translation ?? string.Empty;
+        _translationLine.Visibility = string.IsNullOrEmpty(translation)
             ? Visibility.Collapsed
             : Visibility.Visible;
         UpdateTextLayout();
