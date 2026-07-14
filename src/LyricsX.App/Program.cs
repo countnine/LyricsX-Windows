@@ -43,6 +43,14 @@ internal static class Program
                 Cache = new LyricsX.Core.Search.LyricsCacheStore(cacheDb),
             };
 
+            // "틀린 가사" 억제 목록을 설정에서 복원하고 변경 시 영속화
+            foreach (var key in settings.SuppressedTracks) coordinator.SuppressedTrackKeys.Add(key);
+            coordinator.SuppressedTracksChanged += () =>
+            {
+                settings.SuppressedTracks = coordinator.SuppressedTrackKeys.ToList();
+                settings.Save();
+            };
+
             var overlay = new OverlayWindow(settings);
             overlay.SetUserVisible(settings.OverlayVisible);
 
@@ -122,8 +130,10 @@ internal static class Program
                 if (dialog.ShowDialog() != true) return;
                 try
                 {
-                    // 이중언어: [mm:ss.xx]원문【번역】 (표준 플레이어 호환)
-                    File.WriteAllText(dialog.FileName, lyrics.ToLegacyString(), new System.Text.UTF8Encoding(false));
+                    // 이중언어: [mm:ss.xx]원문【번역】 (표준 플레이어 호환).
+                    // 화면과 동일하게 대상 언어(기계번역 tr:{target}) 번역을 우선 포함.
+                    var lrc = lyrics.ToLegacyString(coordinator.TargetLanguage?.ToLowerInvariant());
+                    File.WriteAllText(dialog.FileName, lrc, new System.Text.UTF8Encoding(false));
                     Log.Write($"[export] {dialog.FileName}");
                 }
                 catch (Exception ex)
@@ -131,6 +141,10 @@ internal static class Program
                     MessageBox.Show($"내보내기 실패: {ex.Message}", "LyricsX", MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
             };
+
+            // 현재 가사가 틀렸을 때: 표시 중단 + 캐시 제거 + 재검색 억제
+            var wrongItem = new MenuItem { Header = "가사 없음으로 표시 (틀린 가사)" };
+            wrongItem.Click += (_, _) => coordinator.MarkWrongLyrics();
 
             var settingsItem = new MenuItem { Header = "설정…" };
             var exitItem = new MenuItem { Header = "종료" };
@@ -245,11 +259,13 @@ internal static class Program
                 var hasLyrics = coordinator.CurrentLyrics is not null && coordinator.CurrentTrack is not null;
                 editItem.IsEnabled = hasLyrics;
                 exportItem.IsEnabled = hasLyrics;
+                wrongItem.IsEnabled = hasLyrics;
             };
             menu.Items.Add(trackItem);
             menu.Items.Add(searchItem);
             menu.Items.Add(editItem);
             menu.Items.Add(exportItem);
+            menu.Items.Add(wrongItem);
             menu.Items.Add(new Separator());
             menu.Items.Add(overlayToggle);
             menu.Items.Add(moveToggle);

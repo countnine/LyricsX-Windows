@@ -165,13 +165,19 @@ public sealed class Lyrics
         return string.Join('\n', components);
     }
 
-    /// <summary>표준 LRC 직렬화 (번역은 【】 인라인)</summary>
-    public string ToLegacyString()
+    /// <summary>
+    /// 표준 LRC 직렬화 (번역은 【】 인라인).
+    /// preferredLang 지정 시 해당 언어 번역(tr:{lang})을 우선하고 없으면 generic(tr)으로 폴백 —
+    /// 화면 표시(기계번역 tr:{target} 우선)와 동일한 우선순위로 내보낸다.
+    /// </summary>
+    public string ToLegacyString(string? preferredLang = null)
     {
         var components = IdTags.Select(kv => $"[{kv.Key}:{kv.Value}]")
             .Concat(Lines.Select(l =>
             {
-                var tr = l.Attachments.Translation();
+                var tr = string.IsNullOrEmpty(preferredLang)
+                    ? l.Attachments.Translation()
+                    : l.Attachments.Translation(preferredLang, null);
                 return $"[{l.TimeTag}]{l.Content}" + (tr is not null ? $"【{tr}】" : "");
             }));
         return string.Join('\n', components);

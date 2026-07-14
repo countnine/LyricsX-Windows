@@ -31,6 +31,9 @@ public sealed class AppSettings
     /// <summary>번역이 원문과 같으면 번역 줄을 숨긴다(예: 영어곡을 EN으로 번역해 원문과 중복).</summary>
     public bool HideSameTranslation { get; set; } = true;
 
+    /// <summary>"틀린 가사"로 표시해 검색·표시를 막을 트랙 키 목록(정규화된 제목|아티스트).</summary>
+    public List<string> SuppressedTracks { get; set; } = new();
+
     /// <summary>수동 싱크 오프셋(초). +면 가사가 빨라진다.</summary>
     public double ManualOffsetSeconds { get; set; }
 

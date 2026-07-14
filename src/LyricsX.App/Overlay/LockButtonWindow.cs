@@ -13,6 +13,9 @@ namespace LyricsX.App.Overlay;
 /// </summary>
 public sealed class LockButtonWindow : Window
 {
+    private static readonly SolidColorBrush IdleBackground = new(Color.FromArgb(0xF0, 0xFF, 0xFF, 0xFF));
+    private static readonly SolidColorBrush HoverBackground = new(Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF));
+
     private readonly TextBlock _icon;
     private readonly Border _chrome;
 
@@ -37,7 +40,9 @@ public sealed class LockButtonWindow : Window
         _chrome = new Border
         {
             CornerRadius = new CornerRadius(8),
-            Background = new SolidColorBrush(Color.FromArgb(0xB8, 0x20, 0x20, 0x20)),
+            Background = IdleBackground,
+            BorderBrush = new SolidColorBrush(Color.FromArgb(0x80, 0x80, 0x80, 0x80)),
+            BorderThickness = new Thickness(1),
             Child = _icon,
             Margin = new Thickness(2),
         };
@@ -49,8 +54,8 @@ public sealed class LockButtonWindow : Window
             e.Handled = true;
             onToggle();
         };
-        MouseEnter += (_, _) => _chrome.Background = new SolidColorBrush(Color.FromArgb(0xE0, 0x35, 0x35, 0x35));
-        MouseLeave += (_, _) => _chrome.Background = new SolidColorBrush(Color.FromArgb(0xB8, 0x20, 0x20, 0x20));
+        MouseEnter += (_, _) => _chrome.Background = HoverBackground;
+        MouseLeave += (_, _) => _chrome.Background = IdleBackground;
 
         SourceInitialized += (_, _) =>
         {

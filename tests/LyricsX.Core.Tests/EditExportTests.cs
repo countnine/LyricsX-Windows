@@ -50,4 +50,21 @@ public class EditExportTests
         // 내보내기는 표준 [mm:ss.fff] 타임태그 사용
         Assert.Contains("[00:01.000]", legacy);
     }
+
+    [Fact]
+    public void LegacyString_PrefersTargetLanguageTranslationForExport()
+    {
+        // 제공자 번역(tr)과 기계번역(tr:ko)이 함께 있을 때
+        var att = new LineAttachments
+        {
+            [LineAttachments.TranslationTag()] = "제공자번역",
+            [LineAttachments.TranslationTag("ko")] = "기계번역",
+        };
+        var lyrics = new Lyrics([new LyricsLine("Line", 1.0, att)]);
+
+        // 대상 언어(ko) 지정 시 기계번역 우선(화면 표시와 동일)
+        Assert.Contains("Line【기계번역】", lyrics.ToLegacyString("ko"));
+        // 지정 없으면 기존대로 generic 우선
+        Assert.Contains("Line【제공자번역】", lyrics.ToLegacyString());
+    }
 }

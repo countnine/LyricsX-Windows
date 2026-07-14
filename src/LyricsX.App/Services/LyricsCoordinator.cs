@@ -56,6 +56,12 @@ public sealed class LyricsCoordinator : IDisposable
     /// <summary>가사 검색 상태 텍스트 (트레이 툴팁 등 상태 표시용)</summary>
     public event Action<string>? StatusChanged;
 
+    /// <summary>"틀린 가사"로 표시된 트랙 키 집합(검색·표시 억제). Program이 설정과 동기화.</summary>
+    public HashSet<string> SuppressedTrackKeys { get; } = new();
+
+    /// <summary>억제 목록 변경 알림(설정 영속화용)</summary>
+    public event Action? SuppressedTracksChanged;
+
     public LyricsCoordinator(NowPlayingService nowPlaying, Dispatcher dispatcher, LyricsSearchService? search = null)
     {
         _nowPlaying = nowPlaying;
@@ -97,6 +103,13 @@ public sealed class LyricsCoordinator : IDisposable
         if (track is null)
         {
             StatusChanged?.Invoke("재생 중인 곡 없음");
+            return;
+        }
+
+        // "틀린 가사"로 표시된 곡은 검색·표시하지 않는다
+        if (SuppressedTrackKeys.Contains(LyricsCacheStore.MakeKey(track.Title, track.Artist)))
+        {
+            StatusChanged?.Invoke($"{track} — 가사 숨김(사용자 표시)");
             return;
         }
 
@@ -162,12 +175,41 @@ public sealed class LyricsCoordinator : IDisposable
         }
     }
 
+    /// <summary>
+    /// 현재 곡을 "틀린 가사"로 표시한다: 캐시에서 제거하고, 표시를 지우고,
+    /// 트랙이 유지되는 동안(및 재생 복귀 시) 재검색·표시를 억제한다.
+    /// </summary>
+    public void MarkWrongLyrics()
+    {
+        if (CurrentTrack is not { } track) return;
+
+        SuppressedTrackKeys.Add(LyricsCacheStore.MakeKey(track.Title, track.Artist));
+        try { Cache?.Remove(track.Title, track.Artist); }
+        catch (Exception e) { Log.Write($"[wrong] 캐시 제거 실패: {e.Message}"); }
+
+        _searchCts?.Cancel();
+        CurrentLyrics = null;
+        _lastLineIndex = int.MinValue;
+        CurrentLineChanged?.Invoke(null);
+        StatusChanged?.Invoke($"{track} — 가사 숨김(틀린 가사)");
+        SuppressedTracksChanged?.Invoke();
+    }
+
+    private void Unsuppress(TrackInfo? track)
+    {
+        if (track is null) return;
+        if (SuppressedTrackKeys.Remove(LyricsCacheStore.MakeKey(track.Title, track.Artist)))
+            SuppressedTracksChanged?.Invoke();
+    }
+
     /// <summary>수동 검색 등 외부에서 선택한 가사를 적용하고 캐시를 갱신한다.</summary>
     public async Task UseLyricsAsync(Lyrics lyrics)
     {
         _searchCts?.Cancel();
         var cts = new CancellationTokenSource();
         _searchCts = cts;
+
+        Unsuppress(CurrentTrack); // 사용자가 직접 고른 가사이므로 억제 해제
 
         CurrentLyrics = lyrics;
         _lastLineIndex = int.MinValue;
@@ -183,6 +225,7 @@ public sealed class LyricsCoordinator : IDisposable
     /// </summary>
     public void SaveEditedLyrics(TrackInfo track, Lyrics lyrics)
     {
+        Unsuppress(track); // 편집·저장한 곡은 억제 해제
         lyrics.Metadata.ServiceName = "사용자 편집";
         try
         {
