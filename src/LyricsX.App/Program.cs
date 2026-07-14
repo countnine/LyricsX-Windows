@@ -105,7 +105,7 @@ internal static class Program
                     return;
                 }
                 editorWindow = new LyricsEditorWindow(
-                    track.ToString(), lyrics.ToString(),
+                    track.ToString(), lyrics,
                     edited => coordinator.SaveEditedLyrics(track, edited));
                 editorWindow.Show();
             };

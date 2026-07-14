@@ -36,6 +36,7 @@ public sealed class OverlayWindow : Window
 
     private InlineTimeTags? _karaoke; // 현재 라인의 글자단위 태그 (null = 라인 단위 폴백)
     private double _lineSpan;          // 현재 라인 표시 구간(초)
+    private bool _translationSuppressedAsSame; // 번역이 원문과 같아 숨긴 상태(폰트 크기 유지용)
 
     /// <summary>이동 모드 여부 (true = 드래그 이동/크기 조절 가능)</summary>
     public bool IsMoveMode => !_clickThrough;
@@ -124,11 +125,13 @@ public sealed class OverlayWindow : Window
         _originalLine.KaraokeProgress = 0;
         _originalLine.KaraokeTime = 0;
 
-        // 옵션: 번역이 원문과 같으면 번역 줄을 숨겨 원문만 표시
-        var translation = line?.Translation;
-        if (_settings.HideSameTranslation && translation is not null && line?.Content is { } content
-            && string.Equals(translation.Trim(), content.Trim(), StringComparison.OrdinalIgnoreCase))
-            translation = null;
+        // 옵션: 번역이 원문과 같으면 번역 줄을 숨겨 원문만 표시.
+        // 단, 이 경우에도 원문 폰트는 '번역 있을 때' 크기를 유지한다(레이아웃 튐 방지).
+        var rawTranslation = line?.Translation;
+        _translationSuppressedAsSame = _settings.HideSameTranslation
+            && rawTranslation is not null && line?.Content is { } content
+            && string.Equals(rawTranslation.Trim(), content.Trim(), StringComparison.OrdinalIgnoreCase);
+        var translation = _translationSuppressedAsSame ? null : rawTranslation;
 
         _translationLine.Text = translation ?? string.Empty;
         _translationLine.Visibility = string.IsNullOrEmpty(translation)
@@ -154,8 +157,10 @@ public sealed class OverlayWindow : Window
     {
         var h = ActualHeight > 0 ? ActualHeight : Height;
         var hasTranslation = _translationLine.Visibility == Visibility.Visible;
+        // 동일 번역 숨김으로 가려진 경우에도 번역 있을 때 크기를 유지
+        var reserveForTranslation = hasTranslation || _translationSuppressedAsSame;
 
-        _originalLine.FontSize = Math.Max(12, hasTranslation ? h * 0.34 : h * 0.44);
+        _originalLine.FontSize = Math.Max(12, reserveForTranslation ? h * 0.34 : h * 0.44);
         _translationLine.FontSize = Math.Max(10, h * 0.21);
 
         // 자연 크기 측정 후 폭 초과분만 축소 (짧은 줄은 확대하지 않음)

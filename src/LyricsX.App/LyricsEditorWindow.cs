@@ -6,30 +6,62 @@ using LyricsX.Core;
 namespace LyricsX.App;
 
 /// <summary>
-/// 현재 가사 편집 창. 확장 LRC 텍스트(무손실)를 편집해 저장하면
-/// 파싱 검증 후 onSaved 콜백으로 넘긴다. 파싱 실패 시 저장을 막고 안내한다.
+/// 현재 가사 편집 창.
+/// - 전체 보기: 확장 LRC(무손실). tt·모든 언어 번역까지 그대로.
+/// - 간편 보기: 선택 언어만 [시간]원문【번역】으로 표시(언어 콤보 제공). 저장 시 원본에 병합.
+/// 저장 시 파싱 검증 후 onSaved 콜백으로 넘긴다.
 /// </summary>
 public sealed class LyricsEditorWindow : Window
 {
-    public LyricsEditorWindow(string trackLabel, string lrcText, Action<Lyrics> onSaved)
+    private sealed record LangItem(string Tag, string Display);
+
+    private readonly TextBox _editor;
+    private readonly TextBlock _status;
+    private readonly CheckBox _simpleToggle;
+    private readonly ComboBox _langCombo;
+    private readonly Action<Lyrics> _onSaved;
+
+    private Lyrics _working;         // 편집 대상 모델
+    private string _selectedTag = LineAttachments.TagTranslationPrefix;
+    private bool _suppress;          // 프로그램적 변경 시 이벤트 무시
+
+    public LyricsEditorWindow(string trackLabel, Lyrics lyrics, Action<Lyrics> onSaved)
     {
+        _working = lyrics;
+        _onSaved = onSaved;
+
         Title = $"가사 편집 — {trackLabel}";
         Width = 560;
-        Height = 620;
+        Height = 640;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
+
+        _simpleToggle = new CheckBox { Content = "간편 보기 (원문+번역)", VerticalAlignment = VerticalAlignment.Center };
+        _langCombo = new ComboBox
+        {
+            Width = 120,
+            Margin = new Thickness(12, 0, 0, 0),
+            DisplayMemberPath = nameof(LangItem.Display),
+            Visibility = Visibility.Collapsed,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        var langLabel = new TextBlock
+        {
+            Text = "언어:", Margin = new Thickness(12, 0, 4, 0),
+            VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed,
+        };
 
         var hint = new TextBlock
         {
-            Text = "형식: [mm:ss.xx]원문  ·  번역은 [mm:ss.xx][tr]번역 줄.\n" +
-                   "글자 단위 노래방 태그([tt] 줄)는 그대로 두면 보존됩니다.",
             Opacity = 0.7,
             TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 0, 0, 8),
+            Margin = new Thickness(0, 6, 0, 6),
         };
+        void UpdateHint() => hint.Text = _simpleToggle.IsChecked == true
+            ? "간편 보기: [mm:ss.xx]원문【번역】. 위 콤보에서 언어 선택. 저장 시 글자 단위 노래방(tt)·다른 언어 번역은 보존됩니다."
+            : "전체 보기(무손실): [mm:ss.xx]원문 · [mm:ss.xx][tr]번역 · [mm:ss.xx][tt]노래방태그. 원문/번역만 고치고 [tt] 줄은 그대로 두세요.";
 
-        var editor = new TextBox
+        _editor = new TextBox
         {
-            Text = lrcText,
             AcceptsReturn = true,
             AcceptsTab = false,
             TextWrapping = TextWrapping.NoWrap,
@@ -39,41 +71,137 @@ public sealed class LyricsEditorWindow : Window
             FontSize = 13,
         };
 
-        var status = new TextBlock
-        {
-            Foreground = Brushes.OrangeRed,
-            TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 8, 0, 0),
-        };
+        _status = new TextBlock { Foreground = Brushes.OrangeRed, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 8, 0, 0) };
 
         var save = new Button { Content = "저장", Width = 90, IsDefault = true, Margin = new Thickness(0, 8, 8, 0) };
         var cancel = new Button { Content = "취소", Width = 90, IsCancel = true, Margin = new Thickness(0, 8, 0, 0) };
 
+        // ---- 이벤트 ----
+        _simpleToggle.Checked += (_, _) => SwitchView(simple: true, langLabel);
+        _simpleToggle.Unchecked += (_, _) => SwitchView(simple: false, langLabel);
+        _langCombo.SelectionChanged += (_, _) =>
+        {
+            if (_suppress || _langCombo.SelectedItem is not LangItem item) return;
+            if (!CaptureEdits()) { RevertLangSelection(); return; }
+            _selectedTag = item.Tag;
+            RenderSimple();
+        };
         save.Click += (_, _) =>
         {
-            var parsed = Lyrics.Parse(editor.Text);
-            if (parsed is null || parsed.Lines.Count == 0)
-            {
-                status.Text = "가사 형식이 올바르지 않습니다. 타임태그([mm:ss.xx]) 줄이 하나 이상 필요합니다.";
-                return;
-            }
-            onSaved(parsed);
+            if (!CaptureEdits()) return;
+            _onSaved(_working);
             Close();
         };
         cancel.Click += (_, _) => Close();
+        _simpleToggle.Checked += (_, _) => UpdateHint();
+        _simpleToggle.Unchecked += (_, _) => UpdateHint();
+
+        // 초기: 전체 보기
+        _editor.Text = _working.ToString();
+        UpdateHint();
+
+        // ---- 레이아웃 ----
+        var topBar = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 4) };
+        topBar.Children.Add(_simpleToggle);
+        topBar.Children.Add(langLabel);
+        topBar.Children.Add(_langCombo);
 
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
         buttons.Children.Add(save);
         buttons.Children.Add(cancel);
 
         var root = new DockPanel { Margin = new Thickness(12) };
+        DockPanel.SetDock(topBar, Dock.Top);
         DockPanel.SetDock(hint, Dock.Top);
         DockPanel.SetDock(buttons, Dock.Bottom);
-        DockPanel.SetDock(status, Dock.Bottom);
+        DockPanel.SetDock(_status, Dock.Bottom);
+        root.Children.Add(topBar);
         root.Children.Add(hint);
         root.Children.Add(buttons);
-        root.Children.Add(status);
-        root.Children.Add(editor); // 남은 공간 채움
+        root.Children.Add(_status);
+        root.Children.Add(_editor);
         Content = root;
     }
+
+    /// <summary>현재 편집기 텍스트를 모델(_working)에 반영. 실패 시 상태 표시 후 false.</summary>
+    private bool CaptureEdits()
+    {
+        _status.Text = "";
+        if (_simpleToggle.IsChecked == true)
+        {
+            var merged = LyricsEditing.ApplySimpleEdit(_working, _editor.Text, _selectedTag);
+            if (merged is null)
+            {
+                _status.Text = "가사 형식이 올바르지 않습니다. 타임태그([mm:ss.xx]) 줄이 하나 이상 필요합니다.";
+                return false;
+            }
+            _working = merged;
+        }
+        else
+        {
+            var parsed = Lyrics.Parse(_editor.Text);
+            if (parsed is null || parsed.Lines.Count == 0)
+            {
+                _status.Text = "가사 형식이 올바르지 않습니다. 타임태그([mm:ss.xx]) 줄이 하나 이상 필요합니다.";
+                return false;
+            }
+            _working = parsed;
+        }
+        return true;
+    }
+
+    private void SwitchView(bool simple, TextBlock langLabel)
+    {
+        if (_suppress) return;
+
+        // 전환 전에 현재 편집 내용을 모델에 반영
+        if (!CaptureEdits())
+        {
+            // 실패하면 토글 되돌림
+            _suppress = true;
+            _simpleToggle.IsChecked = !simple;
+            _suppress = false;
+            return;
+        }
+
+        langLabel.Visibility = simple ? Visibility.Visible : Visibility.Collapsed;
+        _langCombo.Visibility = simple ? Visibility.Visible : Visibility.Collapsed;
+
+        if (simple)
+        {
+            PopulateLangCombo();
+            RenderSimple();
+        }
+        else
+        {
+            _editor.Text = _working.ToString();
+        }
+    }
+
+    private void PopulateLangCombo()
+    {
+        var tags = LyricsEditing.TranslationTags(_working);
+        var items = tags.Select(t => new LangItem(t, TagToDisplay(t))).ToList();
+
+        _suppress = true;
+        _langCombo.ItemsSource = items;
+        var selected = items.FirstOrDefault(i => i.Tag == _selectedTag) ?? items[0];
+        _selectedTag = selected.Tag;
+        _langCombo.SelectedItem = selected;
+        _suppress = false;
+    }
+
+    private void RenderSimple() => _editor.Text = LyricsEditing.ToSimpleText(_working, _selectedTag);
+
+    private void RevertLangSelection()
+    {
+        _suppress = true;
+        _langCombo.SelectedItem = (_langCombo.ItemsSource as IEnumerable<LangItem>)?.FirstOrDefault(i => i.Tag == _selectedTag);
+        _suppress = false;
+    }
+
+    private static string TagToDisplay(string tag) =>
+        tag == LineAttachments.TagTranslationPrefix ? "번역(기본)"
+        : tag.StartsWith("tr:", StringComparison.Ordinal) ? tag[3..].ToUpperInvariant()
+        : tag;
 }
