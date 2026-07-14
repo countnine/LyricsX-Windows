@@ -30,3 +30,7 @@ secrets.json
 
 # Velopack 릴리스 산출물
 Releases/
+
+# 로컬 테스트 빌드 산출물
+publish-test/
+publish-singlefile/

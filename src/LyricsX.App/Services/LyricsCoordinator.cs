@@ -177,6 +177,32 @@ public sealed class LyricsCoordinator : IDisposable
             Cache?.Set(track.Title, track.Artist, lyrics);
     }
 
+    /// <summary>
+    /// 편집된 가사를 캐시에 저장하고(출처=사용자 편집), 여전히 같은 곡이면 즉시 반영한다.
+    /// 사용자가 고친 번역을 덮어쓰지 않도록 기계번역(MT)은 실행하지 않는다.
+    /// </summary>
+    public void SaveEditedLyrics(TrackInfo track, Lyrics lyrics)
+    {
+        lyrics.Metadata.ServiceName = "사용자 편집";
+        try
+        {
+            Cache?.Set(track.Title, track.Artist, lyrics);
+            Log.Write($"[edit] 저장: {track}");
+        }
+        catch (Exception e)
+        {
+            Log.Write($"[edit] 저장 실패: {e.Message}");
+        }
+
+        if (CurrentTrack is { } cur && cur.Title == track.Title && cur.Artist == track.Artist)
+        {
+            _searchCts?.Cancel(); // 진행 중 검색이 편집본을 덮어쓰지 않도록
+            CurrentLyrics = lyrics;
+            _lastLineIndex = int.MinValue; // 현재 라인 재발행
+            StatusChanged?.Invoke($"{track} — 사용자 편집 반영");
+        }
+    }
+
     /// <summary>대상 언어 MT 보장 후 현재 라인 갱신 (캐시 히트면 즉시, 미스면 API 1회)</summary>
     private async Task TranslateAsync(Lyrics lyrics, CancellationToken ct)
     {

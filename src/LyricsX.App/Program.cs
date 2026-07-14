@@ -90,6 +90,48 @@ internal static class Program
             };
             var searchItem = new MenuItem { Header = "가사 검색…" };
             searchItem.Click += (_, _) => new SearchWindow(coordinator).Show();
+
+            // ---- 현재 가사 편집 / 내보내기 ----
+            var editItem = new MenuItem { Header = "현재 가사 편집…" };
+            var exportItem = new MenuItem { Header = "가사 내보내기 (.lrc)…" };
+            LyricsEditorWindow? editorWindow = null;
+
+            editItem.Click += (_, _) =>
+            {
+                if (coordinator.CurrentLyrics is not { } lyrics || coordinator.CurrentTrack is not { } track) return;
+                if (editorWindow is { IsLoaded: true })
+                {
+                    editorWindow.Activate();
+                    return;
+                }
+                editorWindow = new LyricsEditorWindow(
+                    track.ToString(), lyrics.ToString(),
+                    edited => coordinator.SaveEditedLyrics(track, edited));
+                editorWindow.Show();
+            };
+
+            exportItem.Click += (_, _) =>
+            {
+                if (coordinator.CurrentLyrics is not { } lyrics || coordinator.CurrentTrack is not { } track) return;
+                var dialog = new Microsoft.Win32.SaveFileDialog
+                {
+                    Filter = "LRC 파일 (*.lrc)|*.lrc",
+                    DefaultExt = ".lrc",
+                    FileName = SanitizeFileName($"{track.Artist} - {track.Title}") + ".lrc",
+                };
+                if (dialog.ShowDialog() != true) return;
+                try
+                {
+                    // 이중언어: [mm:ss.xx]원문【번역】 (표준 플레이어 호환)
+                    File.WriteAllText(dialog.FileName, lyrics.ToLegacyString(), new System.Text.UTF8Encoding(false));
+                    Log.Write($"[export] {dialog.FileName}");
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"내보내기 실패: {ex.Message}", "LyricsX", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+            };
+
             var settingsItem = new MenuItem { Header = "설정…" };
             var exitItem = new MenuItem { Header = "종료" };
 
@@ -197,8 +239,17 @@ internal static class Program
             }
 
             var menu = new ContextMenu();
+            // 편집/내보내기는 재생 곡+가사가 있을 때만 활성
+            menu.Opened += (_, _) =>
+            {
+                var hasLyrics = coordinator.CurrentLyrics is not null && coordinator.CurrentTrack is not null;
+                editItem.IsEnabled = hasLyrics;
+                exportItem.IsEnabled = hasLyrics;
+            };
             menu.Items.Add(trackItem);
             menu.Items.Add(searchItem);
+            menu.Items.Add(editItem);
+            menu.Items.Add(exportItem);
             menu.Items.Add(new Separator());
             menu.Items.Add(overlayToggle);
             menu.Items.Add(moveToggle);
@@ -288,6 +339,14 @@ internal static class Program
             _ = RunUpdateCheckAsync(userInitiated: false);
         };
         app.Run();
+    }
+
+    /// <summary>파일명으로 쓸 수 없는 문자를 '_'로 치환한다.</summary>
+    private static string SanitizeFileName(string name)
+    {
+        foreach (var c in Path.GetInvalidFileNameChars())
+            name = name.Replace(c, '_');
+        return name.Trim();
     }
 
     /// <summary>런타임 생성 트레이 아이콘: 녹색 원 + "L" (전용 .ico는 M5에서)</summary>
