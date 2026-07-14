@@ -27,3 +27,6 @@ external/
 *.local.json
 appsettings.Development.json
 secrets.json
+
+# Velopack 릴리스 산출물
+Releases/
