@@ -1,53 +1,95 @@
 # LyricsX for Windows
 
-재생 중인 곡의 가사를 자동으로 찾아 데스크톱에 동기화 표시하고, **이중언어(원문 + 번역)**로 보여주는 Windows 앱.
-macOS [LyricsX](https://github.com/ddddxxx/LyricsX)의 Windows 네이티브 재작성판.
+**English** · [한국어](README.ko.md)
 
-## 기능
+> Real-time, bilingual lyrics on your Windows desktop.
 
-- **자동 재생 감지** — Windows SMTC 기반. Spotify, Apple Music, YouTube Music 등 미디어 키를 지원하는 모든 플레이어 대응
-- **다중 소스 가사 검색** — LRCLIB, NetEase에서 검색 후 품질 랭킹으로 최적 가사 자동 선택
-- **이중언어 표시** — 가사 소스가 주는 번역 우선, 없거나 대상 언어가 다르면 **DeepL 기계번역 폴백** (API 키 입력형, 기본 한국어)
-- **데스크톱 오버레이** — 투명·클릭스루·항상 위. 현재 줄 + 번역 2단 표시, 카라오케 진행 채움, 드래그로 위치 이동
-- **가사 캐시** — 한 번 찾은 가사(번역 포함)는 SQLite에 저장, 재재생 시 즉시·오프라인 표시
-- **트레이 제어** — 오버레이 토글, 싱크 오프셋 ±0.5초, 수동 가사 검색, 시작 시 자동 실행
+LyricsX automatically finds the lyrics of the song you're playing, syncs them line-by-line
+(and word-by-word), and shows the **original text with its translation** as a transparent
+desktop overlay. It's a Windows-native rewrite of the macOS app
+[LyricsX](https://github.com/ddddxxx/LyricsX).
 
-## 요구 사항
+**🌐 Homepage & demo: <https://countnine.github.io/lyricsx-home/>**
+&nbsp;·&nbsp; **⬇️ [Download the latest release](https://github.com/countnine/LyricsX-Windows/releases/latest)**
 
-- Windows 10 20H1(2004) 이상 / Windows 11
-- 배포 zip은 self-contained라 .NET 설치 불필요
+## Features
 
-## 사용법
+- **Automatic playback detection** — via Windows SMTC. Works with Spotify, Apple Music,
+  YouTube Music, and any player that supports media keys.
+- **Multi-source lyrics search** — LRCLIB, NetEase, Kugou (酷狗), and QQ Music (QQ音乐),
+  merged and auto-ranked by quality.
+- **Word-level karaoke** — character-by-character fill for sources that provide inline timing
+  (Kugou / QQ / NetEase), with line-level fallback otherwise.
+- **Bilingual display** — original and translated lines stacked together. Uses the source's own
+  translation first, and falls back to **DeepL machine translation** when needed (your API key).
+- **Desktop overlay** — transparent, click-through, always-on-top. Move/resize, fade in/out,
+  optional background panel, auto-hide on fullscreen apps / pause / mouse-over.
+- **Edit & export** — fix the current lyrics in-app (lossless), export to `.lrc`, or mark wrong
+  lyrics to suppress them.
+- **Offline cache** — found lyrics (with translations) are stored in SQLite for instant, offline replay.
+- **Localized UI — 19 languages** — the interface follows your system language (English fallback),
+  selectable in Settings. [Help translate »](TRANSLATING.md)
+- **Privacy** — your DeepL API key is stored **encrypted (Windows DPAPI)** and masked in the UI.
+- **Automatic updates** — Velopack delta updates from GitHub Releases.
 
-1. `LyricsX.exe` 실행 → 트레이(숨김 아이콘 영역 `^`)에 녹색 **L** 아이콘 생성
-2. 음악 재생 → 가사가 자동으로 화면 하단에 표시
-3. 트레이 아이콘 우클릭:
-   - **가사 검색…** — 자동 매칭이 틀렸을 때 직접 검색·교체
-   - **오버레이 위치 이동 모드** — 체크 후 드래그로 이동, 다시 해제
-   - **설정…** — DeepL API 키 / 번역 언어(기본 KO) / 폰트 크기
-4. 데모: `LyricsX.exe --demo` (재생 없이 오버레이 확인)
+## Download & install
 
-### DeepL 번역 설정
+Get the latest build from **[Releases](https://github.com/countnine/LyricsX-Windows/releases/latest)**:
 
-[DeepL API](https://www.deepl.com/pro-api) 무료 키(월 50만 자)를 발급받아 설정에 입력하면,
-가사 소스에 원하는 언어 번역이 없을 때 자동으로 기계번역됩니다. 라인 단위 캐시로 같은 곡은 1회만 번역.
+- **`LyricsX-win-Setup.exe`** — installs with automatic updates (recommended).
+- **`LyricsX-win-Portable.zip`** — no installation; unzip and run.
 
-## 빌드
+> The app isn't code-signed yet, so Windows SmartScreen may warn on first launch — choose
+> *More info → Run anyway*.
+
+### Requirements
+
+- Windows 10 version 2004 (20H1) or later, or Windows 11
+- No .NET install required (builds are self-contained)
+
+## Usage
+
+1. Run `LyricsX.exe` → a green **L** icon appears in the tray (the hidden-icons `^` area).
+2. Play music → lyrics appear automatically near the bottom of the screen.
+3. Right-click the tray icon:
+   - **Search lyrics…** — search and replace when auto-matching is wrong
+   - **Edit current lyrics… / Export (.lrc)…**
+   - **Move/resize overlay** — drag to reposition, then toggle off
+   - **Settings…** — display language, DeepL API key, translation target language, overlay style
+4. Overlay only (no playback): `LyricsX.exe --demo`
+
+### DeepL translation (optional)
+
+Get a free [DeepL API](https://www.deepl.com/pro-api) key (500k characters/month) and enter it in
+**Settings**. When a lyrics source lacks a translation in your target language, lines are machine-
+translated and cached per line (each song is translated only once). The key is stored encrypted.
+
+## Translating the UI
+
+The interface ships in 19 languages (English + Korean hand-translated, plus DeepL seeds). Anyone can
+improve translations directly on GitHub — see **[TRANSLATING.md](TRANSLATING.md)**
+([English](TRANSLATING.en.md)).
+
+## Build
 
 ```powershell
-dotnet build src\LyricsX.App          # 개발 빌드
-dotnet test tests\LyricsX.Core.Tests  # 유닛 테스트
-.\scripts\publish.ps1 -Version 0.1.0  # 배포 zip 생성 (artifacts\)
+dotnet build src/LyricsX.App          # dev build
+dotnet test  tests/LyricsX.Core.Tests # unit tests
 ```
 
-## 구조
+Releasing (Velopack + GitHub Releases) is documented in
+**[RELEASING.md](RELEASING.md)**.
+
+## Project structure
 
 ```
-src/LyricsX.Core/   # UI 무관 엔진: LRC 파서, 제공자(LRCLIB/NetEase), 랭킹, 번역, 캐시
-src/LyricsX.App/    # WPF 앱: SMTC 감지, 동기화, 오버레이, 트레이, 설정
-spikes/             # 기술 검증 스파이크 (SMTC/오버레이/검색)
+src/LyricsX.Core/   # UI-agnostic engine: LRC parsing, providers, ranking, translation, cache
+src/LyricsX.App/    # WPF app: SMTC detection, sync, overlay, tray, settings, i18n
+tools/              # mt-bootstrap.ps1 (DeepL translation seeds)
+spikes/             # technical spikes (SMTC / overlay / search)
 ```
 
-## 라이선스
+## License
 
-원본 LyricsX(GPLv3) 파생. 가사 검색 로직은 [LyricsKit](https://github.com/MxIris-LyricsX-Project/LyricsKit) 포팅.
+Derived from the original LyricsX (GPLv3). Lyrics-search logic is ported from
+[LyricsKit](https://github.com/MxIris-LyricsX-Project/LyricsKit).
