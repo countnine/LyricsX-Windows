@@ -31,30 +31,30 @@ public sealed class SearchWindow : Window
     {
         _coordinator = coordinator;
 
-        Title = "가사 검색";
+        Title = Loc.T("search.title");
         Width = 900;
         Height = 520;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
         _titleBox = new TextBox { Text = coordinator.CurrentTrack?.Title ?? "", MinWidth = 200, Margin = new Thickness(4, 0, 12, 0) };
         _artistBox = new TextBox { Text = coordinator.CurrentTrack?.Artist ?? "", MinWidth = 150, Margin = new Thickness(4, 0, 12, 0) };
-        _searchButton = new Button { Content = "검색", Width = 80, IsDefault = true };
+        _searchButton = new Button { Content = Loc.T("search.button"), Width = 80, IsDefault = true };
         _searchButton.Click += async (_, _) => await RunSearchAsync();
 
         var inputPanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(12) };
-        inputPanel.Children.Add(new TextBlock { Text = "제목:", VerticalAlignment = VerticalAlignment.Center });
+        inputPanel.Children.Add(new TextBlock { Text = Loc.T("search.label.title"), VerticalAlignment = VerticalAlignment.Center });
         inputPanel.Children.Add(_titleBox);
-        inputPanel.Children.Add(new TextBlock { Text = "아티스트:", VerticalAlignment = VerticalAlignment.Center });
+        inputPanel.Children.Add(new TextBlock { Text = Loc.T("search.label.artist"), VerticalAlignment = VerticalAlignment.Center });
         inputPanel.Children.Add(_artistBox);
         inputPanel.Children.Add(_searchButton);
 
         var grid = new GridView();
-        grid.Columns.Add(new GridViewColumn { Header = "소스", Width = 70, DisplayMemberBinding = new System.Windows.Data.Binding("Service") });
-        grid.Columns.Add(new GridViewColumn { Header = "제목", Width = 170, DisplayMemberBinding = new System.Windows.Data.Binding("Title") });
-        grid.Columns.Add(new GridViewColumn { Header = "아티스트", Width = 110, DisplayMemberBinding = new System.Windows.Data.Binding("Artist") });
-        grid.Columns.Add(new GridViewColumn { Header = "라인", Width = 45, DisplayMemberBinding = new System.Windows.Data.Binding("LineCount") });
-        grid.Columns.Add(new GridViewColumn { Header = "번역", Width = 45, DisplayMemberBinding = new System.Windows.Data.Binding("Translated") });
-        grid.Columns.Add(new GridViewColumn { Header = "품질", Width = 55, DisplayMemberBinding = new System.Windows.Data.Binding("Quality") });
+        grid.Columns.Add(new GridViewColumn { Header = Loc.T("search.col.source"), Width = 70, DisplayMemberBinding = new System.Windows.Data.Binding("Service") });
+        grid.Columns.Add(new GridViewColumn { Header = Loc.T("search.col.title"), Width = 170, DisplayMemberBinding = new System.Windows.Data.Binding("Title") });
+        grid.Columns.Add(new GridViewColumn { Header = Loc.T("search.col.artist"), Width = 110, DisplayMemberBinding = new System.Windows.Data.Binding("Artist") });
+        grid.Columns.Add(new GridViewColumn { Header = Loc.T("search.col.lines"), Width = 45, DisplayMemberBinding = new System.Windows.Data.Binding("LineCount") });
+        grid.Columns.Add(new GridViewColumn { Header = Loc.T("search.col.translated"), Width = 45, DisplayMemberBinding = new System.Windows.Data.Binding("Translated") });
+        grid.Columns.Add(new GridViewColumn { Header = Loc.T("search.col.quality"), Width = 55, DisplayMemberBinding = new System.Windows.Data.Binding("Quality") });
 
         _resultList = new ListView { View = grid };
         _resultList.MouseDoubleClick += async (_, _) => await ApplySelectedAsync();
@@ -77,7 +77,7 @@ public sealed class SearchWindow : Window
 
         _applyButton = new Button
         {
-            Content = "선택한 가사 적용",
+            Content = Loc.T("search.apply"),
             Width = 140,
             IsEnabled = false,
             HorizontalAlignment = HorizontalAlignment.Right,
@@ -127,7 +127,7 @@ public sealed class SearchWindow : Window
         _cts = cts;
 
         _searchButton.IsEnabled = false;
-        _statusText.Text = "검색 중…";
+        _statusText.Text = Loc.T("search.status.searching");
         _resultList.ItemsSource = null;
         _preview.Text = "";
 
@@ -146,7 +146,9 @@ public sealed class SearchWindow : Window
                 l.Lines.Count,
                 l.HasTranslation() ? "O" : "-",
                 l.Quality().ToString("0.00"))).ToList();
-            _statusText.Text = results.Count == 0 ? "결과 없음" : $"{results.Count}건 (품질 순) — 항목을 선택하면 오른쪽에 미리보기";
+            _statusText.Text = results.Count == 0
+                ? Loc.T("search.status.none")
+                : Loc.T("search.status.count", ("count", results.Count));
 
             if (_resultList.Items.Count > 0)
                 _resultList.SelectedIndex = 0; // 최상위(최고 품질) 자동 선택 → 미리보기 표시
@@ -157,7 +159,7 @@ public sealed class SearchWindow : Window
         }
         catch (Exception e)
         {
-            _statusText.Text = $"검색 실패: {e.Message}";
+            _statusText.Text = Loc.T("search.status.fail", ("error", e.Message));
         }
         finally
         {

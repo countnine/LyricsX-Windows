@@ -102,14 +102,14 @@ public sealed class LyricsCoordinator : IDisposable
 
         if (track is null)
         {
-            StatusChanged?.Invoke("재생 중인 곡 없음");
+            StatusChanged?.Invoke(Loc.T("status.noTrack"));
             return;
         }
 
         // "틀린 가사"로 표시된 곡은 검색·표시하지 않는다
         if (SuppressedTrackKeys.Contains(LyricsCacheStore.MakeKey(track.Title, track.Artist)))
         {
-            StatusChanged?.Invoke($"{track} — 가사 숨김(사용자 표시)");
+            StatusChanged?.Invoke(Loc.T("status.hidden.user", ("track", track.ToString())));
             return;
         }
 
@@ -118,14 +118,14 @@ public sealed class LyricsCoordinator : IDisposable
         {
             CurrentLyrics = cached;
             _lastLineIndex = int.MinValue;
-            StatusChanged?.Invoke($"{track} — 캐시 ({cached.Metadata.ServiceName})");
+            StatusChanged?.Invoke(Loc.T("status.cache", ("track", track.ToString()), ("service", cached.Metadata.ServiceName ?? "")));
             var cacheCts = new CancellationTokenSource();
             _searchCts = cacheCts;
             await TranslateAsync(cached, cacheCts.Token); // 언어 변경 시 보충 번역
             return;
         }
 
-        StatusChanged?.Invoke($"{track} — 가사 검색 중…");
+        StatusChanged?.Invoke(Loc.T("status.searching", ("track", track.ToString())));
         var cts = new CancellationTokenSource();
         _searchCts = cts;
 
@@ -142,14 +142,17 @@ public sealed class LyricsCoordinator : IDisposable
                 {
                     CurrentLyrics = lyrics;
                     _lastLineIndex = int.MinValue; // 라인 재계산 강제
-                    StatusChanged?.Invoke($"{track} — {lyrics.Metadata.ServiceName} (q={lyrics.Quality():0.00})");
+                    StatusChanged?.Invoke(Loc.T("status.found",
+                        ("track", track.ToString()),
+                        ("service", lyrics.Metadata.ServiceName ?? ""),
+                        ("quality", lyrics.Quality().ToString("0.00"))));
                     await TranslateAsync(lyrics, cts.Token);
                 }
             }
 
             if (CurrentLyrics is null)
             {
-                StatusChanged?.Invoke($"{track} — 가사를 찾지 못함");
+                StatusChanged?.Invoke(Loc.T("status.notFound", ("track", track.ToString())));
             }
             else if (!cts.Token.IsCancellationRequested)
             {
@@ -191,7 +194,7 @@ public sealed class LyricsCoordinator : IDisposable
         CurrentLyrics = null;
         _lastLineIndex = int.MinValue;
         CurrentLineChanged?.Invoke(null);
-        StatusChanged?.Invoke($"{track} — 가사 숨김(틀린 가사)");
+        StatusChanged?.Invoke(Loc.T("status.wrong", ("track", track.ToString())));
         SuppressedTracksChanged?.Invoke();
     }
 
@@ -213,7 +216,9 @@ public sealed class LyricsCoordinator : IDisposable
 
         CurrentLyrics = lyrics;
         _lastLineIndex = int.MinValue;
-        StatusChanged?.Invoke($"{CurrentTrack} — 수동 선택 ({lyrics.Metadata.ServiceName})");
+        StatusChanged?.Invoke(Loc.T("status.manual",
+            ("track", CurrentTrack?.ToString() ?? ""),
+            ("service", lyrics.Metadata.ServiceName ?? "")));
         await TranslateAsync(lyrics, cts.Token);
         if (CurrentTrack is { } track && !cts.Token.IsCancellationRequested)
             Cache?.Set(track.Title, track.Artist, lyrics);
@@ -242,7 +247,7 @@ public sealed class LyricsCoordinator : IDisposable
             _searchCts?.Cancel(); // 진행 중 검색이 편집본을 덮어쓰지 않도록
             CurrentLyrics = lyrics;
             _lastLineIndex = int.MinValue; // 현재 라인 재발행
-            StatusChanged?.Invoke($"{track} — 사용자 편집 반영");
+            StatusChanged?.Invoke(Loc.T("status.edited", ("track", track.ToString())));
         }
     }
 

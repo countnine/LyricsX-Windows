@@ -1,0 +1,43 @@
+name: 번역 제안 / Translation suggestion
+description: UI 번역 수정·추가를 제안합니다 (Suggest a UI translation fix or addition)
+title: "[i18n] "
+labels: ["translation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        UI 문자열 번역 제안 양식입니다. 카탈로그: `src/LyricsX.App/i18n/`, 원문 기준: `en.json`.
+        Git이 익숙하면 파일을 직접 편집해 PR을 열어도 됩니다 (TRANSLATING.md 참고).
+  - type: input
+    id: language
+    attributes:
+      label: 언어 / Language
+      description: "예/e.g.: ko, ja, de, zh-Hans, pt-BR"
+      placeholder: ja
+    validations:
+      required: true
+  - type: input
+    id: key
+    attributes:
+      label: 키 / Key
+      description: "en.json의 키 (the key from en.json). 예/e.g.: settings.save"
+      placeholder: settings.save
+    validations:
+      required: true
+  - type: input
+    id: current
+    attributes:
+      label: 현재 문구 / Current text
+      description: 지금 표시되는(또는 어색한) 번역. Optional.
+  - type: textarea
+    id: suggested
+    attributes:
+      label: 제안 문구 / Suggested translation
+      description: "자리표시자(`{value}` 등)는 그대로 유지해 주세요. Keep placeholders like {value} unchanged."
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: 비고 / Notes
+      description: 맥락·이유 등. Optional.

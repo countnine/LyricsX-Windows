@@ -22,6 +22,7 @@ internal static class Program
         app.Startup += async (_, _) =>
         {
             var settings = AppSettings.Load();
+            Loc.Initialize(settings.UiLanguage); // UI 다국어: 창 생성 전에 언어 확정
             var nowPlaying = await NowPlayingService.CreateAsync();
 
             // 번역: SQLite 라인 캐시 + DeepL(키 있을 때만)
@@ -71,16 +72,16 @@ internal static class Program
             }
 
             // ---- 트레이 메뉴 ----
-            var trackItem = new MenuItem { Header = "재생 중인 곡 없음", IsEnabled = false };
-            var overlayToggle = new MenuItem { Header = "오버레이 표시", IsCheckable = true, IsChecked = settings.OverlayVisible };
-            var moveToggle = new MenuItem { Header = "오버레이 위치 이동 모드", IsCheckable = true };
+            var trackItem = new MenuItem { Header = Loc.T("status.noTrack"), IsEnabled = false };
+            var overlayToggle = new MenuItem { Header = Loc.T("tray.overlay.show"), IsCheckable = true, IsChecked = settings.OverlayVisible };
+            var moveToggle = new MenuItem { Header = Loc.T("tray.overlay.moveMode"), IsCheckable = true };
             var offsetLabel = new MenuItem { IsEnabled = false };
-            var offsetPlus = new MenuItem { Header = "가사 빠르게 (+0.5초)" };
-            var offsetMinus = new MenuItem { Header = "가사 느리게 (-0.5초)" };
-            var offsetReset = new MenuItem { Header = "오프셋 초기화" };
+            var offsetPlus = new MenuItem { Header = Loc.T("tray.offset.faster") };
+            var offsetMinus = new MenuItem { Header = Loc.T("tray.offset.slower") };
+            var offsetReset = new MenuItem { Header = Loc.T("tray.offset.reset") };
             var startupToggle = new MenuItem
             {
-                Header = "Windows 시작 시 자동 실행",
+                Header = Loc.T("tray.startup"),
                 IsCheckable = true,
                 IsChecked = StartupManager.IsEnabled(),
             };
@@ -96,12 +97,12 @@ internal static class Program
                     startupToggle.IsChecked = StartupManager.IsEnabled();
                 }
             };
-            var searchItem = new MenuItem { Header = "가사 검색…" };
+            var searchItem = new MenuItem { Header = Loc.T("tray.search") };
             searchItem.Click += (_, _) => new SearchWindow(coordinator).Show();
 
             // ---- 현재 가사 편집 / 내보내기 ----
-            var editItem = new MenuItem { Header = "현재 가사 편집…" };
-            var exportItem = new MenuItem { Header = "가사 내보내기 (.lrc)…" };
+            var editItem = new MenuItem { Header = Loc.T("tray.edit") };
+            var exportItem = new MenuItem { Header = Loc.T("tray.export") };
             LyricsEditorWindow? editorWindow = null;
 
             editItem.Click += (_, _) =>
@@ -123,7 +124,7 @@ internal static class Program
                 if (coordinator.CurrentLyrics is not { } lyrics || coordinator.CurrentTrack is not { } track) return;
                 var dialog = new Microsoft.Win32.SaveFileDialog
                 {
-                    Filter = "LRC 파일 (*.lrc)|*.lrc",
+                    Filter = Loc.T("export.filter"),
                     DefaultExt = ".lrc",
                     FileName = SanitizeFileName($"{track.Artist} - {track.Title}") + ".lrc",
                 };
@@ -138,21 +139,26 @@ internal static class Program
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"내보내기 실패: {ex.Message}", "LyricsX", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show(Loc.T("export.fail", ("error", ex.Message)), "LyricsX", MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
             };
 
             // 현재 가사가 틀렸을 때: 표시 중단 + 캐시 제거 + 재검색 억제
-            var wrongItem = new MenuItem { Header = "가사 없음으로 표시 (틀린 가사)" };
+            var wrongItem = new MenuItem { Header = Loc.T("tray.wrong") };
             wrongItem.Click += (_, _) => coordinator.MarkWrongLyrics();
 
-            var settingsItem = new MenuItem { Header = "설정…" };
-            var exitItem = new MenuItem { Header = "종료" };
+            var settingsItem = new MenuItem { Header = Loc.T("tray.settings") };
+            var exitItem = new MenuItem { Header = Loc.T("tray.exit") };
 
             // ---- 자동 업데이트 (Velopack + GitHub Releases) ----
             var updater = new UpdateService();
             Velopack.UpdateInfo? pendingUpdate = null;
-            var updateItem = new MenuItem { Header = $"업데이트 확인… (v{updater.CurrentVersion})" };
+            var updateItem = new MenuItem { Header = Loc.T("tray.update.check", ("version", updater.CurrentVersion.ToString())) };
+
+            void UpdateUpdateItemText() =>
+                updateItem.Header = pendingUpdate is { } p
+                    ? Loc.T("tray.update.install", ("version", p.TargetFullRelease.Version.ToString()))
+                    : Loc.T("tray.update.check", ("version", updater.CurrentVersion.ToString()));
 
             async Task RunUpdateCheckAsync(bool userInitiated)
             {
@@ -162,8 +168,8 @@ internal static class Program
                     {
                         if (userInitiated)
                             MessageBox.Show(
-                                $"개발 빌드에서는 자동 업데이트를 사용할 수 없습니다.\n현재 버전: v{updater.CurrentVersion}",
-                                "LyricsX 업데이트", MessageBoxButton.OK, MessageBoxImage.Information);
+                                Loc.T("update.dev", ("version", updater.CurrentVersion.ToString())),
+                                Loc.T("update.title"), MessageBoxButton.OK, MessageBoxImage.Information);
                         return;
                     }
 
@@ -172,14 +178,14 @@ internal static class Program
                     {
                         if (userInitiated)
                             MessageBox.Show(
-                                $"최신 버전입니다. (v{updater.CurrentVersion})",
-                                "LyricsX 업데이트", MessageBoxButton.OK, MessageBoxImage.Information);
+                                Loc.T("update.latest", ("version", updater.CurrentVersion.ToString())),
+                                Loc.T("update.title"), MessageBoxButton.OK, MessageBoxImage.Information);
                         return;
                     }
 
                     var newVersion = info.TargetFullRelease.Version.ToString();
                     pendingUpdate = info;
-                    updateItem.Header = $"⬆ 업데이트 설치 (v{newVersion})";
+                    UpdateUpdateItemText();
 
                     if (!userInitiated)
                     {
@@ -188,8 +194,8 @@ internal static class Program
                     }
 
                     var answer = MessageBox.Show(
-                        $"새 버전 v{newVersion} 이(가) 있습니다. (현재 v{updater.CurrentVersion})\n지금 설치하고 재시작할까요?",
-                        "LyricsX 업데이트", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                        Loc.T("update.available", ("version", newVersion), ("current", updater.CurrentVersion.ToString())),
+                        Loc.T("update.title"), MessageBoxButton.YesNo, MessageBoxImage.Question);
                     if (answer == MessageBoxResult.Yes)
                     {
                         settings.Save();
@@ -202,8 +208,8 @@ internal static class Program
                     Log.Write($"[update] 확인 실패: {e.Message}");
                     if (userInitiated)
                         MessageBox.Show(
-                            $"업데이트 확인 중 오류가 발생했습니다.\n{e.Message}",
-                            "LyricsX 업데이트", MessageBoxButton.OK, MessageBoxImage.Warning);
+                            Loc.T("update.error", ("error", e.Message)),
+                            Loc.T("update.title"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
             }
 
@@ -228,7 +234,7 @@ internal static class Program
             };
 
             void UpdateOffsetLabel() =>
-                offsetLabel.Header = $"싱크 오프셋: {coordinator.ManualOffsetSeconds:+0.0;-0.0;0}초";
+                offsetLabel.Header = Loc.T("tray.offset.label", ("value", coordinator.ManualOffsetSeconds.ToString("+0.0;-0.0;0")));
             UpdateOffsetLabel();
 
             overlayToggle.Click += (_, _) =>
@@ -283,7 +289,7 @@ internal static class Program
             var tray = new TaskbarIcon
             {
                 Icon = CreateTrayIcon(),
-                ToolTipText = $"LyricsX v{updater.CurrentVersion}",
+                ToolTipText = Loc.T("tray.tooltip.version", ("version", updater.CurrentVersion.ToString())),
                 ContextMenu = menu,
             };
             // H.NotifyIcon 2.x는 명시적 생성이 필요할 수 있다 (없으면 아이콘 미표시)
@@ -305,7 +311,7 @@ internal static class Program
             coordinator.StatusChanged += status =>
             {
                 trackItem.Header = status;
-                tray.ToolTipText = $"LyricsX\n{status}";
+                tray.ToolTipText = Loc.T("tray.tooltip.status", ("status", status));
                 Log.Write($"[status] {status}");
             };
             coordinator.CurrentLineChanged += line =>
@@ -347,6 +353,31 @@ internal static class Program
                 demoTimer.Start();
                 Log.Write("[demo] 데모 모드 시작");
             }
+
+            // 언어 변경 시 트레이 메뉴·툴팁을 즉시 다시 현지화
+            void ApplyMenuText()
+            {
+                overlayToggle.Header = Loc.T("tray.overlay.show");
+                moveToggle.Header = Loc.T("tray.overlay.moveMode");
+                offsetPlus.Header = Loc.T("tray.offset.faster");
+                offsetMinus.Header = Loc.T("tray.offset.slower");
+                offsetReset.Header = Loc.T("tray.offset.reset");
+                startupToggle.Header = Loc.T("tray.startup");
+                searchItem.Header = Loc.T("tray.search");
+                editItem.Header = Loc.T("tray.edit");
+                exportItem.Header = Loc.T("tray.export");
+                wrongItem.Header = Loc.T("tray.wrong");
+                settingsItem.Header = Loc.T("tray.settings");
+                exitItem.Header = Loc.T("tray.exit");
+                UpdateOffsetLabel();
+                UpdateUpdateItemText();
+                if (coordinator.CurrentTrack is null)
+                {
+                    trackItem.Header = Loc.T("status.noTrack");
+                    tray.ToolTipText = Loc.T("tray.tooltip.version", ("version", updater.CurrentVersion.ToString()));
+                }
+            }
+            Loc.CultureChanged += ApplyMenuText;
 
             coordinator.Start(); // 배선 완료 후 시작 (캐시/번역/상태 이벤트 유효)
             Log.Write("=== LyricsX 시작 (M5) ===");

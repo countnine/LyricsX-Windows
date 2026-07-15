@@ -218,7 +218,7 @@ public sealed class OverlayWindow : Window
             : ComputeBackgroundBrush();
         if (moveMode && string.IsNullOrEmpty(_originalLine.Text))
         {
-            _originalLine.Text = "드래그: 이동 · 가장자리: 크기 조절";
+            _originalLine.Text = Loc.T("overlay.moveHint");
             UpdateTextLayout();
         }
 

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -52,15 +53,51 @@ public sealed class AppSettings
     /// <summary>수동 싱크 오프셋(초). +면 가사가 빨라진다.</summary>
     public double ManualOffsetSeconds { get; set; }
 
-    /// <summary>DeepL API 키 (미설정 시 기계번역 폴백 없음)</summary>
+    /// <summary>DeepL API 키(평문) — 앱 내에서만 사용, 파일엔 저장하지 않는다(암호화본만 저장).</summary>
+    [JsonIgnore]
     public string? DeeplApiKey { get; set; }
 
-    /// <summary>DeepL target_lang. 미설정/공백이면 한국어(KO).</summary>
-    public string TargetLanguage { get; set; } = "KO";
+    /// <summary>DeepL 키의 DPAPI 암호문(base64). settings.json에 실제 저장되는 값.</summary>
+    [JsonPropertyName("deeplApiKeyEnc")]
+    public string? DeeplApiKeyEncrypted { get; set; }
+
+    /// <summary>구버전 평문 키("deeplApiKey") — 마이그레이션 전용(읽기만, 저장 시 제거).</summary>
+    [JsonPropertyName("deeplApiKey")]
+    public string? LegacyDeeplApiKey { get; set; }
+
+    /// <summary>DeepL target_lang. 최초 실행 시 시스템 언어로 기본 설정(미지원이면 EN-US).</summary>
+    public string TargetLanguage { get; set; } = DefaultTargetLanguage();
+
+    /// <summary>UI 표시 언어. "system"이면 시스템 언어를 따르고, 미지원이면 영어로 폴백.</summary>
+    public string UiLanguage { get; set; } = "system";
 
     [JsonIgnore]
     public string EffectiveTargetLanguage =>
-        string.IsNullOrWhiteSpace(TargetLanguage) ? "KO" : TargetLanguage.Trim().ToUpperInvariant();
+        string.IsNullOrWhiteSpace(TargetLanguage) ? DefaultTargetLanguage() : TargetLanguage.Trim().ToUpperInvariant();
+
+    /// <summary>
+    /// 시스템 UI 언어를 DeepL target_lang 코드로 매핑한 기본 번역 대상 언어.
+    /// (설정 로드 시점에는 아직 UI 언어 오버라이드 전이라 CurrentUICulture = 시스템 언어)
+    /// </summary>
+    public static string DefaultTargetLanguage()
+    {
+        var c = CultureInfo.CurrentUICulture;
+        var two = c.TwoLetterISOLanguageName.ToUpperInvariant();
+        return two switch
+        {
+            "EN" => "EN-US",
+            "PT" => c.Name.EndsWith("-PT", StringComparison.OrdinalIgnoreCase) ? "PT-PT" : "PT-BR",
+            "ZH" => c.Name.Contains("Hant", StringComparison.OrdinalIgnoreCase)
+                    || c.Name.EndsWith("-TW", StringComparison.OrdinalIgnoreCase)
+                    || c.Name.EndsWith("-HK", StringComparison.OrdinalIgnoreCase)
+                    || c.Name.EndsWith("-MO", StringComparison.OrdinalIgnoreCase) ? "ZH-HANT" : "ZH",
+            // DeepL이 target_lang으로 지원하는 언어면 2글자 코드 그대로 사용
+            "KO" or "JA" or "DE" or "FR" or "ES" or "IT" or "NL" or "PL" or "RU" or "UK" or "TR"
+                or "CS" or "ID" or "AR" or "VI" or "BG" or "DA" or "EL" or "ET" or "FI" or "HU"
+                or "LT" or "LV" or "NB" or "RO" or "SK" or "SL" or "SV" => two,
+            _ => "EN-US", // 미지원 시스템 언어 → 영어
+        };
+    }
 
     private static readonly string SettingsPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "LyricsX", "settings.json");
@@ -69,6 +106,7 @@ public sealed class AppSettings
     {
         WriteIndented = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull, // null 필드(구 평문 키 등) 미기록
     };
 
     public static AppSettings Load()
@@ -76,7 +114,11 @@ public sealed class AppSettings
         try
         {
             if (File.Exists(SettingsPath))
-                return JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(SettingsPath), JsonOptions) ?? new AppSettings();
+            {
+                var settings = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(SettingsPath), JsonOptions) ?? new AppSettings();
+                settings.ResolveSecrets();
+                return settings;
+            }
         }
         catch
         {
@@ -85,10 +127,23 @@ public sealed class AppSettings
         return new AppSettings();
     }
 
+    /// <summary>암호문 복호화 또는 구버전 평문 키 마이그레이션 → 평문 DeeplApiKey 확정.</summary>
+    private void ResolveSecrets()
+    {
+        if (!string.IsNullOrEmpty(DeeplApiKeyEncrypted))
+            DeeplApiKey = Secret.Unprotect(DeeplApiKeyEncrypted);
+        else if (!string.IsNullOrWhiteSpace(LegacyDeeplApiKey))
+            DeeplApiKey = LegacyDeeplApiKey; // 구버전 평문 → 다음 Save에서 암호화
+        LegacyDeeplApiKey = null;            // 평문 필드는 더 이상 보관/기록하지 않음
+    }
+
     public void Save()
     {
         try
         {
+            // 평문 키는 파일에 쓰지 않고, DPAPI 암호문만 저장
+            DeeplApiKeyEncrypted = Secret.Protect(DeeplApiKey);
+            LegacyDeeplApiKey = null;
             Directory.CreateDirectory(Path.GetDirectoryName(SettingsPath)!);
             File.WriteAllText(SettingsPath, JsonSerializer.Serialize(this, JsonOptions));
         }

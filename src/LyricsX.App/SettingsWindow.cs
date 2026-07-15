@@ -1,15 +1,20 @@
+using System.Diagnostics;
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Navigation;
 using LyricsX.App.Services;
 
 namespace LyricsX.App;
 
 /// <summary>
-/// 최소 설정 창: DeepL API 키, 대상 언어, 오버레이 스타일.
-/// 저장 시 onSaved 콜백으로 앱에 즉시 반영한다.
+/// 설정 창. 탭으로 구성: [일반] 언어·번역, [오버레이 스타일] 색·배경·표시 옵션.
+/// UI 문자열은 <see cref="Loc"/>로 현지화하며, 언어 변경 시 내용을 즉시 다시 그린다.
+/// 긴 번역 문자열이 잘리지 않도록 헤더·체크박스·라벨은 줄바꿈한다.
 /// </summary>
 public sealed class SettingsWindow : Window
 {
@@ -25,6 +30,10 @@ public sealed class SettingsWindow : Window
         "#795548", "#607D8B", "#FF0000", "#00FF00", "#0000FF", "#FFFF00", "#00FFFF", "#FF00FF",
     ];
 
+    private readonly AppSettings _settings;
+    private readonly Action _onSaved;
+    private bool _rebuilding; // 언어 변경으로 콤보를 프로그램적으로 세팅할 때 이벤트 억제
+
     private static SolidColorBrush BrushFromHex(string hex)
     {
         try { return new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex)); }
@@ -33,234 +42,337 @@ public sealed class SettingsWindow : Window
 
     public SettingsWindow(AppSettings settings, Action onSaved)
     {
-        Title = "LyricsX 설정";
-        Width = 420;
-        SizeToContent = SizeToContent.Height;
+        _settings = settings;
+        _onSaved = onSaved;
+
+        Width = 470;
+        SizeToContent = SizeToContent.Height; // 내용 높이에 맞춰 자동(세로 스크롤 없음)
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
         ResizeMode = ResizeMode.NoResize;
+        MaxHeight = SystemParameters.WorkArea.Height; // 화면을 넘지 않도록 상한
 
-        var apiKeyBox = new TextBox { Text = settings.DeeplApiKey ?? "", Margin = new Thickness(0, 2, 0, 10) };
-        var langBox = new ComboBox
-        {
-            IsEditable = true,
-            Text = settings.TargetLanguage,
-            ItemsSource = CommonLanguages,
-            Margin = new Thickness(0, 2, 0, 10),
-        };
+        BuildUi();
+        Loc.CultureChanged += BuildUi;                 // 언어 바뀌면 다시 그림
+        Closed += (_, _) => Loc.CultureChanged -= BuildUi;
+    }
 
-        var fontHint = new TextBlock
-        {
-            Text = "텍스트 크기는 오버레이 크기에 맞춰 자동 조절됩니다.\n(오버레이에 마우스를 올려 🔒 클릭 → 이동/크기 조절 모드)",
-            Opacity = 0.7,
-            TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 4, 0, 12),
-        };
+    /// <summary>언어 선택 항목(코드 + 표시명). "system"은 시스템 언어를 따른다.</summary>
+    private sealed record LanguageChoice(string Code, string Display);
 
-        // ---- 오버레이 스타일 ----
-        (TextBox Box, Border Preview, StackPanel Row) MakeColorRow(string label, string value)
+    // 줄바꿈되는 섹션 헤더
+    private static TextBlock Header(string key) => new()
+    {
+        Text = Loc.T(key),
+        FontWeight = FontWeights.SemiBold,
+        TextWrapping = TextWrapping.Wrap,
+        Margin = new Thickness(0, 8, 0, 2),
+    };
+
+    // 내용이 길면 줄바꿈되는 체크박스
+    private static CheckBox WrapCheck(string key, bool isChecked, Thickness margin) => new()
+    {
+        Content = new TextBlock { Text = Loc.T(key), TextWrapping = TextWrapping.Wrap },
+        IsChecked = isChecked,
+        Margin = margin,
+        HorizontalAlignment = HorizontalAlignment.Stretch,
+        HorizontalContentAlignment = HorizontalAlignment.Left,
+    };
+
+    private void BuildUi()
+    {
+        _rebuilding = true;
+        try
         {
-            var box = new TextBox { Text = value, Width = 90, Margin = new Thickness(8, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center };
-            var preview = new Border
+            Title = Loc.T("settings.title");
+            var settings = _settings;
+
+            // ================= [일반] 탭 =================
+            // 폭을 명시(SizeToContent.Height에서 폭 전파 누락으로 글자단위 줄바꿈되는 문제 방지)
+            var general = new StackPanel { Margin = new Thickness(16), Width = 410, HorizontalAlignment = HorizontalAlignment.Left };
+
+            // 표시 언어
+            var langChoices = new List<LanguageChoice> { new(Loc.SystemSetting, Loc.T("settings.language.system")) };
+            langChoices.AddRange(Loc.SupportedLanguages.Select(l => new LanguageChoice(l.Code, l.NativeName)));
+            var uiLangBox = new ComboBox
             {
-                Width = 24, Height = 24,
-                CornerRadius = new CornerRadius(4),
-                BorderBrush = Brushes.Gray,
-                BorderThickness = new Thickness(1),
-                VerticalAlignment = VerticalAlignment.Center,
-                Cursor = Cursors.Hand,
-                ToolTip = "클릭하여 색 선택",
+                ItemsSource = langChoices,
+                DisplayMemberPath = nameof(LanguageChoice.Display),
+                SelectedValuePath = nameof(LanguageChoice.Code),
+                SelectedValue = Loc.Setting,
+                Width = 210,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Margin = new Thickness(0, 2, 0, 6),
             };
-            void UpdatePreview()
+            if (uiLangBox.SelectedValue is null) uiLangBox.SelectedIndex = 0;
+            uiLangBox.SelectionChanged += (_, _) =>
             {
-                try
-                {
-                    preview.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(box.Text.Trim()));
-                }
-                catch
-                {
-                    preview.Background = Brushes.Transparent;
-                }
-            }
-            box.TextChanged += (_, _) => UpdatePreview();
-            UpdatePreview();
-
-            // 색 클릭 시 팔레트 팝업 → 스와치 선택 시 hex 반영
-            var palette = new WrapPanel { Width = 8 * 26 };
-            var popup = new Popup
-            {
-                StaysOpen = false,
-                AllowsTransparency = true,
-                Placement = PlacementMode.Bottom,
-                PlacementTarget = preview,
+                if (_rebuilding || uiLangBox.SelectedValue is not string code || code == Loc.Setting) return;
+                settings.UiLanguage = code;
+                settings.Save();
+                Loc.SetLanguage(code); // → CultureChanged → BuildUi 재실행
             };
-            foreach (var hex in PaletteColors)
+
+            var contribute = new TextBlock { Margin = new Thickness(0, 0, 0, 10), TextWrapping = TextWrapping.Wrap };
+            var link = new Hyperlink(new Run(Loc.T("settings.contribute")))
             {
-                var captured = hex;
-                var swatch = new Button
+                NavigateUri = new Uri(Loc.ContributionUrl),
+                ToolTip = Loc.T("settings.contribute.tooltip"),
+            };
+            link.RequestNavigate += OnRequestNavigate;
+            contribute.Inlines.Add(link);
+
+            // API 키: 기본은 마스킹(PasswordBox), 눈(👁) 토글로만 잠깐 평문 표시.
+            var keyMasked = new PasswordBox { VerticalContentAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 2, 4, 10) };
+            keyMasked.Password = settings.DeeplApiKey ?? "";
+            var keyPlain = new TextBox { VerticalContentAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 2, 4, 10), Visibility = Visibility.Collapsed };
+            var keyReveal = new ToggleButton
+            {
+                Content = "👁", Width = 30,
+                Margin = new Thickness(0, 2, 10, 10),
+                ToolTip = Loc.T("settings.deepl.key.reveal"),
+            };
+            keyReveal.Checked += (_, _) =>
+            {
+                keyPlain.Text = keyMasked.Password;
+                keyMasked.Visibility = Visibility.Collapsed;
+                keyPlain.Visibility = Visibility.Visible;
+                keyPlain.Focus();
+            };
+            keyReveal.Unchecked += (_, _) =>
+            {
+                keyMasked.Password = keyPlain.Text;
+                keyPlain.Visibility = Visibility.Collapsed;
+                keyMasked.Visibility = Visibility.Visible;
+            };
+            string CurrentKey() => keyReveal.IsChecked == true ? keyPlain.Text : keyMasked.Password;
+
+            var keyRow = new Grid { Margin = new Thickness(0, 0, 0, 0) };
+            keyRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            keyRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            Grid.SetColumn(keyMasked, 0);
+            Grid.SetColumn(keyPlain, 0);
+            Grid.SetColumn(keyReveal, 1);
+            keyRow.Children.Add(keyMasked);
+            keyRow.Children.Add(keyPlain);
+            keyRow.Children.Add(keyReveal);
+
+            var langBox = new ComboBox
+            {
+                IsEditable = true,
+                Text = settings.TargetLanguage,
+                ItemsSource = CommonLanguages,
+                Width = 210,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Margin = new Thickness(0, 2, 0, 10),
+            };
+
+            general.Children.Add(Header("settings.language.header"));
+            general.Children.Add(uiLangBox);
+            general.Children.Add(contribute);
+            general.Children.Add(Header("settings.deepl.key.header"));
+            general.Children.Add(keyRow);
+            general.Children.Add(Header("settings.deepl.lang.header"));
+            general.Children.Add(langBox);
+
+            // 동작 옵션 토글(일반 탭)
+            var karaokeCheck = WrapCheck("settings.karaoke.check", settings.CharacterKaraoke, new Thickness(0, 14, 0, 0));
+            var hideSameTransCheck = WrapCheck("settings.hideSameTranslation", settings.HideSameTranslation, new Thickness(0, 6, 0, 0));
+            var fadeCheck = WrapCheck("settings.fade", settings.FadeAnimation, new Thickness(0, 6, 0, 0));
+            var hideOnHoverCheck = WrapCheck("settings.hideOnMouseOver", settings.HideOnMouseOver, new Thickness(0, 6, 0, 0));
+            general.Children.Add(karaokeCheck);
+            general.Children.Add(hideSameTransCheck);
+            general.Children.Add(fadeCheck);
+            general.Children.Add(hideOnHoverCheck);
+
+            // ================= [오버레이 스타일] 탭 =================
+            var appearance = new StackPanel { Margin = new Thickness(16), Width = 410, HorizontalAlignment = HorizontalAlignment.Left };
+
+            appearance.Children.Add(new TextBlock
+            {
+                Text = Loc.T("settings.fontHint"),
+                Opacity = 0.7,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 0, 0, 10),
+            });
+
+            (TextBox Box, Border Preview, StackPanel Row) MakeColorRow(string label, string value)
+            {
+                var box = new TextBox { Text = value, Width = 90, Margin = new Thickness(8, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center };
+                var preview = new Border
                 {
-                    Width = 24, Height = 24, Margin = new Thickness(1),
-                    Background = BrushFromHex(hex),
-                    BorderBrush = Brushes.DarkGray,
+                    Width = 24, Height = 24,
+                    CornerRadius = new CornerRadius(4),
+                    BorderBrush = Brushes.Gray,
                     BorderThickness = new Thickness(1),
+                    VerticalAlignment = VerticalAlignment.Center,
                     Cursor = Cursors.Hand,
-                    ToolTip = hex,
+                    ToolTip = Loc.T("settings.color.pick.tooltip"),
                 };
-                swatch.Click += (_, _) => { box.Text = captured; popup.IsOpen = false; };
-                palette.Children.Add(swatch);
+                void UpdatePreview()
+                {
+                    try { preview.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(box.Text.Trim())); }
+                    catch { preview.Background = Brushes.Transparent; }
+                }
+                box.TextChanged += (_, _) => UpdatePreview();
+                UpdatePreview();
+
+                var palette = new WrapPanel { Width = 8 * 26 };
+                var popup = new Popup
+                {
+                    StaysOpen = false,
+                    AllowsTransparency = true,
+                    Placement = PlacementMode.Bottom,
+                    PlacementTarget = preview,
+                };
+                foreach (var hex in PaletteColors)
+                {
+                    var captured = hex;
+                    var swatch = new Button
+                    {
+                        Width = 24, Height = 24, Margin = new Thickness(1),
+                        Background = BrushFromHex(hex),
+                        BorderBrush = Brushes.DarkGray,
+                        BorderThickness = new Thickness(1),
+                        Cursor = Cursors.Hand,
+                        ToolTip = hex,
+                    };
+                    swatch.Click += (_, _) => { box.Text = captured; popup.IsOpen = false; };
+                    palette.Children.Add(swatch);
+                }
+                popup.Child = new Border
+                {
+                    Background = Brushes.White,
+                    BorderBrush = Brushes.Gray,
+                    BorderThickness = new Thickness(1),
+                    CornerRadius = new CornerRadius(4),
+                    Padding = new Thickness(4),
+                    Child = palette,
+                };
+                preview.MouseLeftButtonUp += (_, _) => popup.IsOpen = true;
+
+                var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 3, 0, 3) };
+                row.Children.Add(new TextBlock
+                {
+                    Text = label, Width = 120, TextWrapping = TextWrapping.Wrap,
+                    VerticalAlignment = VerticalAlignment.Center,
+                });
+                row.Children.Add(box);
+                row.Children.Add(preview);
+                row.Children.Add(popup);
+                return (box, preview, row);
             }
-            popup.Child = new Border
+
+            var textColor = MakeColorRow(Loc.T("settings.color.text"), settings.TextColor);
+            var karaokeColor = MakeColorRow(Loc.T("settings.color.karaoke"), settings.KaraokeColor);
+            var translationColor = MakeColorRow(Loc.T("settings.color.translation"), settings.TranslationColor);
+            var outlineColor = MakeColorRow(Loc.T("settings.color.outline"), settings.OutlineColor);
+
+            var outlineLabel = new TextBlock { Margin = new Thickness(0, 6, 0, 0), TextWrapping = TextWrapping.Wrap };
+            var outlineSlider = new Slider
             {
-                Background = Brushes.White,
-                BorderBrush = Brushes.Gray,
-                BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(4),
-                Padding = new Thickness(4),
-                Child = palette,
+                Minimum = 0, Maximum = 8, Value = settings.OutlineThickness,
+                TickFrequency = 0.5, IsSnapToTickEnabled = true,
+                Width = 210, HorizontalAlignment = HorizontalAlignment.Left,
             };
-            preview.MouseLeftButtonUp += (_, _) => popup.IsOpen = true;
+            void UpdateOutlineLabel() =>
+                outlineLabel.Text = Loc.T("settings.outline.thickness", ("value", outlineSlider.Value.ToString("0.#", CultureInfo.CurrentCulture)));
+            outlineSlider.ValueChanged += (_, _) => UpdateOutlineLabel();
+            UpdateOutlineLabel();
 
-            var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 3, 0, 3) };
-            row.Children.Add(new TextBlock { Text = label, Width = 110, VerticalAlignment = VerticalAlignment.Center });
-            row.Children.Add(box);
-            row.Children.Add(preview);
-            row.Children.Add(popup);
-            return (box, preview, row);
-        }
-
-        var textColor = MakeColorRow("원문 색", settings.TextColor);
-        var karaokeColor = MakeColorRow("노래방 진행 색", settings.KaraokeColor);
-        var translationColor = MakeColorRow("번역 색", settings.TranslationColor);
-        var outlineColor = MakeColorRow("외곽선 색", settings.OutlineColor);
-
-        var outlineLabel = new TextBlock { Margin = new Thickness(0, 6, 0, 0) };
-        var outlineSlider = new Slider
-        {
-            Minimum = 0, Maximum = 8, Value = settings.OutlineThickness,
-            TickFrequency = 0.5, IsSnapToTickEnabled = true,
-        };
-        void UpdateOutlineLabel() => outlineLabel.Text = $"외곽선 두께: {outlineSlider.Value:0.#}";
-        outlineSlider.ValueChanged += (_, _) => UpdateOutlineLabel();
-        UpdateOutlineLabel();
-
-        var karaokeCheck = new CheckBox
-        {
-            Content = "글자 단위 노래방 (지원 곡: Kugou/QQ 등)",
-            IsChecked = settings.CharacterKaraoke,
-            Margin = new Thickness(0, 12, 0, 0),
-        };
-
-        var hideSameTransCheck = new CheckBox
-        {
-            Content = "원문과 같은 번역 숨기기",
-            IsChecked = settings.HideSameTranslation,
-            Margin = new Thickness(0, 6, 0, 0),
-        };
-
-        var fadeCheck = new CheckBox
-        {
-            Content = "가사 나타남/사라짐 페이드 효과",
-            IsChecked = settings.FadeAnimation,
-            Margin = new Thickness(0, 6, 0, 0),
-        };
-
-        var hideOnHoverCheck = new CheckBox
-        {
-            Content = "마우스를 올리면 오버레이 숨기기(가림 방지)",
-            IsChecked = settings.HideOnMouseOver,
-            Margin = new Thickness(0, 6, 0, 0),
-        };
-
-        // ---- 오버레이 배경 ----
-        var bgEnableCheck = new CheckBox
-        {
-            Content = "오버레이 배경 표시",
-            IsChecked = settings.OverlayBackgroundEnabled,
-            Margin = new Thickness(0, 12, 0, 4),
-        };
-        var bgColor = MakeColorRow("배경 색", settings.OverlayBackgroundColor);
-        var bgOpacityLabel = new TextBlock { Margin = new Thickness(0, 4, 0, 0) };
-        var bgOpacitySlider = new Slider
-        {
-            Minimum = 0, Maximum = 1, Value = Math.Clamp(settings.OverlayBackgroundOpacity, 0, 1),
-            TickFrequency = 0.05, IsSnapToTickEnabled = true,
-        };
-        void UpdateBgOpacityLabel() => bgOpacityLabel.Text = $"배경 불투명도: {bgOpacitySlider.Value * 100:0}%";
-        bgOpacitySlider.ValueChanged += (_, _) => UpdateBgOpacityLabel();
-        UpdateBgOpacityLabel();
-
-        var saveButton = new Button
-        {
-            Content = "저장",
-            Width = 90,
-            IsDefault = true,
-            HorizontalAlignment = HorizontalAlignment.Right,
-            Margin = new Thickness(0, 14, 0, 0),
-        };
-        static string NormalizeHex(string input, string fallback)
-        {
-            var t = input.Trim();
-            try
+            // 배경
+            var bgEnableCheck = WrapCheck("settings.background.show", settings.OverlayBackgroundEnabled, new Thickness(0, 12, 0, 4));
+            var bgColor = MakeColorRow(Loc.T("settings.color.background"), settings.OverlayBackgroundColor);
+            var bgOpacityLabel = new TextBlock { Margin = new Thickness(0, 4, 0, 0), TextWrapping = TextWrapping.Wrap };
+            var bgOpacitySlider = new Slider
             {
-                _ = System.Windows.Media.ColorConverter.ConvertFromString(t);
-                return t;
-            }
-            catch
+                Minimum = 0, Maximum = 1, Value = Math.Clamp(settings.OverlayBackgroundOpacity, 0, 1),
+                TickFrequency = 0.05, IsSnapToTickEnabled = true,
+                Width = 210, HorizontalAlignment = HorizontalAlignment.Left,
+            };
+            void UpdateBgOpacityLabel() =>
+                bgOpacityLabel.Text = Loc.T("settings.background.opacity", ("value", (bgOpacitySlider.Value * 100).ToString("0", CultureInfo.CurrentCulture)));
+            bgOpacitySlider.ValueChanged += (_, _) => UpdateBgOpacityLabel();
+            UpdateBgOpacityLabel();
+
+            appearance.Children.Add(textColor.Row);
+            appearance.Children.Add(karaokeColor.Row);
+            appearance.Children.Add(translationColor.Row);
+            appearance.Children.Add(outlineColor.Row);
+            appearance.Children.Add(outlineLabel);
+            appearance.Children.Add(outlineSlider);
+            appearance.Children.Add(bgEnableCheck);
+            appearance.Children.Add(bgColor.Row);
+            appearance.Children.Add(bgOpacityLabel);
+            appearance.Children.Add(bgOpacitySlider);
+
+            // ================= 탭 컨트롤 =================
+            // ScrollViewer 없이 각 탭 내용을 직접 넣고, 창을 SizeToContent로 맞춰 세로 스크롤이 없게 한다.
+            var tabs = new TabControl { Margin = new Thickness(8, 8, 8, 0) };
+            tabs.Items.Add(new TabItem { Header = Loc.T("settings.tab.general"), Content = general });
+            tabs.Items.Add(new TabItem { Header = Loc.T("settings.tab.appearance"), Content = appearance });
+            // 탭 전환 시 새 탭 높이에 맞춰 창을 다시 계산(콤보 등 하위 SelectionChanged 버블은 제외)
+            tabs.SelectionChanged += (_, e) =>
             {
-                return fallback;
+                if (e.OriginalSource is TabControl)
+                {
+                    SizeToContent = SizeToContent.Manual;
+                    SizeToContent = SizeToContent.Height;
+                }
+            };
+
+            // ================= 저장 버튼 =================
+            static string NormalizeHex(string input, string fallback)
+            {
+                var t = input.Trim();
+                try { _ = ColorConverter.ConvertFromString(t); return t; }
+                catch { return fallback; }
             }
+            var saveButton = new Button
+            {
+                Content = Loc.T("common.save"),
+                Width = 90,
+                IsDefault = true,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Margin = new Thickness(16, 10, 16, 12),
+            };
+            saveButton.Click += (_, _) =>
+            {
+                var enteredKey = CurrentKey();
+                settings.DeeplApiKey = string.IsNullOrWhiteSpace(enteredKey) ? null : enteredKey.Trim();
+                settings.TargetLanguage = string.IsNullOrWhiteSpace(langBox.Text) ? AppSettings.DefaultTargetLanguage() : langBox.Text.Trim().ToUpperInvariant();
+                settings.TextColor = NormalizeHex(textColor.Box.Text, settings.TextColor);
+                settings.KaraokeColor = NormalizeHex(karaokeColor.Box.Text, settings.KaraokeColor);
+                settings.TranslationColor = NormalizeHex(translationColor.Box.Text, settings.TranslationColor);
+                settings.OutlineColor = NormalizeHex(outlineColor.Box.Text, settings.OutlineColor);
+                settings.OutlineThickness = outlineSlider.Value;
+                settings.CharacterKaraoke = karaokeCheck.IsChecked == true;
+                settings.HideSameTranslation = hideSameTransCheck.IsChecked == true;
+                settings.FadeAnimation = fadeCheck.IsChecked == true;
+                settings.HideOnMouseOver = hideOnHoverCheck.IsChecked == true;
+                settings.OverlayBackgroundEnabled = bgEnableCheck.IsChecked == true;
+                settings.OverlayBackgroundColor = NormalizeHex(bgColor.Box.Text, settings.OverlayBackgroundColor);
+                settings.OverlayBackgroundOpacity = bgOpacitySlider.Value;
+                settings.Save();
+                _onSaved();
+                Close();
+            };
+
+            var root = new DockPanel();
+            DockPanel.SetDock(saveButton, Dock.Bottom);
+            root.Children.Add(saveButton);
+            root.Children.Add(tabs);
+            Content = root;
         }
+        finally
+        {
+            _rebuilding = false;
+        }
+    }
 
-        saveButton.Click += (_, _) =>
-        {
-            settings.DeeplApiKey = string.IsNullOrWhiteSpace(apiKeyBox.Text) ? null : apiKeyBox.Text.Trim();
-            settings.TargetLanguage = string.IsNullOrWhiteSpace(langBox.Text) ? "KO" : langBox.Text.Trim().ToUpperInvariant();
-            settings.TextColor = NormalizeHex(textColor.Box.Text, settings.TextColor);
-            settings.KaraokeColor = NormalizeHex(karaokeColor.Box.Text, settings.KaraokeColor);
-            settings.TranslationColor = NormalizeHex(translationColor.Box.Text, settings.TranslationColor);
-            settings.OutlineColor = NormalizeHex(outlineColor.Box.Text, settings.OutlineColor);
-            settings.OutlineThickness = outlineSlider.Value;
-            settings.CharacterKaraoke = karaokeCheck.IsChecked == true;
-            settings.HideSameTranslation = hideSameTransCheck.IsChecked == true;
-            settings.FadeAnimation = fadeCheck.IsChecked == true;
-            settings.HideOnMouseOver = hideOnHoverCheck.IsChecked == true;
-            settings.OverlayBackgroundEnabled = bgEnableCheck.IsChecked == true;
-            settings.OverlayBackgroundColor = NormalizeHex(bgColor.Box.Text, settings.OverlayBackgroundColor);
-            settings.OverlayBackgroundOpacity = bgOpacitySlider.Value;
-            settings.Save();
-            onSaved();
-            Close();
-        };
-
-        var panel = new StackPanel { Margin = new Thickness(16) };
-        panel.Children.Add(new TextBlock
-        {
-            Text = "DeepL API 키 (비우면 제공자 번역만 사용)",
-            FontWeight = FontWeights.SemiBold,
-        });
-        panel.Children.Add(apiKeyBox);
-        panel.Children.Add(new TextBlock
-        {
-            Text = "번역 대상 언어 (DeepL target_lang, 기본 KO)",
-            FontWeight = FontWeights.SemiBold,
-        });
-        panel.Children.Add(langBox);
-        panel.Children.Add(fontHint);
-        panel.Children.Add(new TextBlock { Text = "오버레이 스타일", FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 4, 0, 4) });
-        panel.Children.Add(textColor.Row);
-        panel.Children.Add(karaokeColor.Row);
-        panel.Children.Add(translationColor.Row);
-        panel.Children.Add(outlineColor.Row);
-        panel.Children.Add(outlineLabel);
-        panel.Children.Add(outlineSlider);
-        panel.Children.Add(karaokeCheck);
-        panel.Children.Add(hideSameTransCheck);
-        panel.Children.Add(fadeCheck);
-        panel.Children.Add(hideOnHoverCheck);
-        panel.Children.Add(bgEnableCheck);
-        panel.Children.Add(bgColor.Row);
-        panel.Children.Add(bgOpacityLabel);
-        panel.Children.Add(bgOpacitySlider);
-        panel.Children.Add(saveButton);
-        Content = panel;
+    private static void OnRequestNavigate(object sender, RequestNavigateEventArgs e)
+    {
+        try { Process.Start(new ProcessStartInfo(e.Uri.ToString()) { UseShellExecute = true }); }
+        catch { /* 브라우저 실행 실패는 무시 */ }
+        e.Handled = true;
     }
 }

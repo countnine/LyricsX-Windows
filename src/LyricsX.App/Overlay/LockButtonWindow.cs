@@ -4,6 +4,7 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using LyricsX.App.Services;
 
 namespace LyricsX.App.Overlay;
 
@@ -111,7 +112,7 @@ public sealed class LockButtonWindow : Window
         _shackle.Stroke = color;
         _body.Stroke = color;
         _keyhole.Fill = color;
-        ToolTip = locked ? "클릭: 오버레이 이동/크기 조절 모드" : "클릭: 오버레이 고정 (클릭스루)";
+        ToolTip = locked ? Loc.T("lock.tooltip.locked") : Loc.T("lock.tooltip.unlocked");
     }
 
     public void ShowAt(double left, double top)

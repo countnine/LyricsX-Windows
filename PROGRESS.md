@@ -1,7 +1,29 @@
 # PROGRESS — LyricsX for Windows
 
-> **상태: v0.8.0 (2026-07-15)** — 오버레이 UX 옵션 5종
+> **상태: v0.9.0 (2026-07-15)** — UI 다국어(19개어) + DeepL 키 보안 + 설정 UI 개편
 > 재개 방법: "이어서"라고 입력하면 아래 백로그부터 진행.
+
+## v0.9.0 요약 (다국어 + 보안 + 설정 UI)
+- **UI 다국어 19개어**(en 참조 + ko 손번역 + DeepL 시드 17), 시스템 언어 기본·영어 폴백, 설정 언어 선택기 + GitHub 번역 기여 링크. 최초 실행 시 표시언어·번역대상언어를 시스템 언어로 기본 선택.
+- **DeepL 키 보안**: settings.json에 DPAPI 암호화 저장(구 평문 자동 마이그레이션) + 설정창 PasswordBox 마스킹·눈토글.
+- **설정창 개편**: 탭 2개(일반/오버레이 스타일), 긴 문구 줄바꿈, 콤보·슬라이더 폭 조정, 세로 스크롤 제거.
+- 상세는 아래 각 절 참조.
+
+## 보안: DeepL 키 보호
+- **저장 암호화**: settings.json에 평문 대신 **DPAPI(CurrentUser) 암호문**(`deeplApiKeyEnc`)만 저장. 구버전 평문 키(`deeplApiKey`)는 로드 시 자동 마이그레이션(다음 저장에서 암호화, 평문 필드 제거). `Services/Secret.cs`, `AppSettings`(JsonIgnore 평문 접근자 + WhenWritingNull). NuGet `System.Security.Cryptography.ProtectedData`.
+- **화면 마스킹**: 설정창 API 키를 `PasswordBox`(점 표시)로 가리고 눈(👁) 토글로만 잠깐 평문 표시. `SettingsWindow`.
+- 점검 결과: 전송은 HTTPS 헤더(안전), 로그·내보내기·git엔 키 미노출(안전). 검증: 마이그레이션→암호문 저장(평문 `:fx` 파일에서 사라짐)→재로드 복호화(마스킹 표시)까지 실측 확인.
+- 한계: 동일 사용자·동일 PC 코드는 DPAPI 복호 가능(로컬 앱 비밀 한계). 설정 잠금(비밀번호)은 과함으로 미채택. **주의: 0.9.0 실행 시 기존 평문 키가 자동 암호화되어 구 0.8.0에선 키 인식 불가**(재입력 필요).
+
+## 다국어(UI i18n) — 작업 중 (미배포)
+프레임워크: **로케일별 JSON + ICU MessageFormat**, 참조어=영어(en), 기여=**GitHub 네이티브**(편집·PR/이슈). 자세한 제안·결정은 세션 기록 참조.
+- **런타임 조회 서비스** `Services/Localization.cs`(`Loc.T(key, args)`) — 임베디드 JSON 카탈로그 로드, 문화권 폴백((설정·시스템)→정확/중립 매칭→en), ICU 인자/복수형, `CultureChanged` 이벤트. 설정 `AppSettings.UiLanguage`(기본 `"system"`), 시작 시 `Loc.Initialize`.
+- **P1 완료: 전 UI 현지화** — 설정창·트레이 메뉴·검색창·편집창·오버레이 힌트·자물쇠 툴팁·업데이트/내보내기 MessageBox·코디네이터 상태문구까지 `Loc.T`로 치환(키 83개). 설정창에 **표시 언어 드롭다운 + "번역 개선하기…" Weblate 링크**. 언어 변경 시 설정창·트레이 즉시 재현지화(`CultureChanged`).
+- **지원 언어 19종**: 기본 10(en, ko, ja, zh-Hans, zh-Hant, es, pt-BR, fr, de, ru) + OSS 활발 9(it, pl, tr, nl, uk, cs, vi, id, ar).
+- **번역 기여 = GitHub 네이티브**(인프라 0, 승인 불필요): "번역 개선하기…" 링크(`Loc.ContributionUrl`)가 리포 `TRANSLATING.md`로 → i18n JSON 직접 편집·PR 또는 이슈 템플릿(`.github/ISSUE_TEMPLATE/translation.yml`)으로 제안. Hosted Weblate(libre)는 승인 대기라 보류(추후 Tolgee/Weblate 셀프호스팅·Hosted Weblate로 이관 가능).
+- **MT 시드**: `tools/mt-bootstrap.ps1`(DeepL, **ICU 자리표시자 XML 태그 보호+검증**). 17개 언어 카탈로그를 DeepL로 시드 생성(자리표시자 무결성 100%, 검증 통과).
+- 검증: 빌드 Debug/Release 클린, 유닛 73 통과, 카탈로그 19종 JSON·키정합·자리표시자 검증, ko/en/ja/de 런타임 로드 확인. **남은 것**: MT 시드 사람 검토, 릴리스 배포.
+- 미현지화(데이터성, 의도적): 편집본 `ServiceName="사용자 편집"` 마커, `search.status.count` 복수형 내부어(MT는 영어 유지 → 기여자가 다듬음).
 
 ## v0.8.0 추가분 (오버레이 UX 옵션 5종)
 1. **페이드 인/아웃** — 가사 줄이 바뀔 때 크로스페이드, 오버레이가 나타나고 사라질 때 창 불투명도 페이드(180ms). 설정 `FadeAnimation`(기본 켬). 진행 갱신(SetProgress)은 페이드 없이, 내용 변경 시에만 크로스페이드. `OverlayWindow.SetLine/ApplyLineContent/ShowOverlay/HideOverlay`
