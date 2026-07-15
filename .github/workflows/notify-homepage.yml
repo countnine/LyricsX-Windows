@@ -1,0 +1,45 @@
+name: Notify homepage of release
+
+# When a release is published on this repo, immediately wake the homepage
+# (countnine/lyricsx-home) so its "Latest release: vX.Y.Z" label refreshes.
+#
+# The homepage workflow ("Sync latest release version") listens for a
+# repository_dispatch of type `release-published` and resolves the newest
+# non-prerelease release itself (via /releases/latest) — so all we do here is
+# fire that dispatch. This replaces the manual scripts/notify-homepage.ps1 step.
+#
+# Requires a repo secret HOMEPAGE_DISPATCH_TOKEN: a PAT with write access to
+# countnine/lyricsx-home (classic `repo` scope, or a fine-grained PAT scoped to
+# lyricsx-home with Contents: write). The default GITHUB_TOKEN cannot dispatch
+# across repositories.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch: {}   # allow a manual re-trigger from the Actions tab
+
+permissions: {}           # no GITHUB_TOKEN permissions needed; we use the PAT
+
+concurrency:
+  group: notify-homepage
+  cancel-in-progress: true
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    # Skip prereleases (the homepage tracks the latest stable release only).
+    # workflow_dispatch has no release payload, so always allow the manual run.
+    if: ${{ github.event_name == 'workflow_dispatch' || !github.event.release.prerelease }}
+    steps:
+      - name: Fire repository_dispatch at the homepage repo
+        env:
+          GH_TOKEN: ${{ secrets.HOMEPAGE_DISPATCH_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::HOMEPAGE_DISPATCH_TOKEN secret is not set. See .github/workflows/notify-homepage.yml header."
+            exit 1
+          fi
+          gh api --method POST \
+            repos/countnine/lyricsx-home/dispatches \
+            -f event_type=release-published
+          echo "Triggered homepage version sync (repository_dispatch: release-published)."
