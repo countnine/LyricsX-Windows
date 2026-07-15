@@ -1,16 +1,23 @@
-# LyricsX for Windows
+<div align="center">
 
-**English** · [한국어](README.ko.md)
+<img src="docs/img/icon.png" width="88" alt="LyricsX logo">
 
-> Real-time, bilingual lyrics on your Windows desktop.
+<h1>LyricsX for Windows</h1>
+
+<b>Real-time, bilingual lyrics on your Windows desktop.</b>
+
+<b>English</b> · <a href="README.ko.md">한국어</a>
+
+<img src="docs/img/demo.gif" width="480" alt="LyricsX demo">
+
+🌐 <a href="https://countnine.github.io/lyricsx-home/"><b>Homepage &amp; demo</b></a> · ⬇️ <a href="https://github.com/countnine/LyricsX-Windows/releases/latest"><b>Download</b></a>
+
+</div>
 
 LyricsX automatically finds the lyrics of the song you're playing, syncs them line-by-line
 (and word-by-word), and shows the **original text with its translation** as a transparent
 desktop overlay. It's a Windows-native rewrite of the macOS app
 [LyricsX](https://github.com/ddddxxx/LyricsX).
-
-**🌐 Homepage & demo: <https://countnine.github.io/lyricsx-home/>**
-&nbsp;·&nbsp; **⬇️ [Download the latest release](https://github.com/countnine/LyricsX-Windows/releases/latest)**
 
 ## Features
 

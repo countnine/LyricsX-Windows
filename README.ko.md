@@ -1,15 +1,22 @@
-# LyricsX for Windows
+<div align="center">
 
-[English](README.md) · **한국어**
+<img src="docs/img/icon.png" width="88" alt="LyricsX 로고">
 
-> Windows 데스크톱에 실시간 이중언어 가사를.
+<h1>LyricsX for Windows</h1>
+
+<b>Windows 데스크톱에 실시간 이중언어 가사를.</b>
+
+<a href="README.md">English</a> · <b>한국어</b>
+
+<img src="docs/img/demo.gif" width="480" alt="LyricsX 데모">
+
+🌐 <a href="https://countnine.github.io/lyricsx-home/"><b>소개 페이지 · 데모</b></a> · ⬇️ <a href="https://github.com/countnine/LyricsX-Windows/releases/latest"><b>다운로드</b></a>
+
+</div>
 
 LyricsX는 재생 중인 곡의 가사를 자동으로 찾아 줄 단위(그리고 글자 단위)로 동기화하고,
 **원문과 번역을 함께** 투명한 데스크톱 오버레이로 보여줍니다. macOS 앱
 [LyricsX](https://github.com/ddddxxx/LyricsX)의 Windows 네이티브 재작성판입니다.
-
-**🌐 소개 페이지 · 데모: <https://countnine.github.io/lyricsx-home/>**
-&nbsp;·&nbsp; **⬇️ [최신 릴리스 다운로드](https://github.com/countnine/LyricsX-Windows/releases/latest)**
 
 ## 기능
 
