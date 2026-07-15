@@ -84,5 +84,6 @@
   "status.notFound": "{track} — text písně nebyl nalezen",
   "status.wrong": "{track} — text písně skrytý (nesprávný text)",
   "status.manual": "{track} — ruční výběr ({service})",
-  "status.edited": "{track} — provedena úprava uživatelem"
+  "status.edited": "{track} — provedena úprava uživatelem",
+  "settings.onlyTargetTranslation": "Show only the target-language translation (needs a DeepL key; provider translations, usually Chinese, are hidden)"
 }

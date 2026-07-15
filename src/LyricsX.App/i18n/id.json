@@ -84,5 +84,6 @@
   "status.notFound": "{track} — lirik tidak ditemukan",
   "status.wrong": "{track} — lirik disembunyikan (lirik salah)",
   "status.manual": "{track} — pemilihan manual ({service})",
-  "status.edited": "{track} — perubahan yang dilakukan pengguna telah diterapkan"
+  "status.edited": "{track} — perubahan yang dilakukan pengguna telah diterapkan",
+  "settings.onlyTargetTranslation": "Show only the target-language translation (needs a DeepL key; provider translations, usually Chinese, are hidden)"
 }

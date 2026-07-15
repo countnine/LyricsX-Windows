@@ -84,5 +84,6 @@
   "status.notFound": "{track} — текст песни не найден",
   "status.wrong": "{track} — текст песни скрыт (неверный текст)",
   "status.manual": "{track} — ручной выбор ({service})",
-  "status.edited": "{track} — изменения пользователя применены"
+  "status.edited": "{track} — изменения пользователя применены",
+  "settings.onlyTargetTranslation": "Show only the target-language translation (needs a DeepL key; provider translations, usually Chinese, are hidden)"
 }

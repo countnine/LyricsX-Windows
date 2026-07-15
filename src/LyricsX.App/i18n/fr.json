@@ -84,5 +84,6 @@
   "status.notFound": "{track} — paroles introuvables",
   "status.wrong": "{track} — paroles masquées (paroles erronées)",
   "status.manual": "{track} — sélection manuelle ({service})",
-  "status.edited": "{track} — modification de l'utilisateur appliquée"
+  "status.edited": "{track} — modification de l'utilisateur appliquée",
+  "settings.onlyTargetTranslation": "Show only the target-language translation (needs a DeepL key; provider translations, usually Chinese, are hidden)"
 }

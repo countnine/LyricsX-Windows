@@ -84,5 +84,6 @@
   "status.notFound": "{track} — لم يتم العثور على كلمات الأغنية",
   "status.wrong": "{track} — كلمات الأغنية مخفية (كلمات خاطئة)",
   "status.manual": "{track} — الاختيار اليدوي ({service})",
-  "status.edited": "{track} — تم تطبيق تعديل المستخدم"
+  "status.edited": "{track} — تم تطبيق تعديل المستخدم",
+  "settings.onlyTargetTranslation": "Show only the target-language translation (needs a DeepL key; provider translations, usually Chinese, are hidden)"
 }

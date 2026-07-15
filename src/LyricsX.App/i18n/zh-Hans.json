@@ -84,5 +84,6 @@
   "status.notFound": "{track} — 未找到歌词",
   "status.wrong": "{track} — 歌词已隐藏（歌词有误）",
   "status.manual": "{track} — 手动选择（{service}）",
-  "status.edited": "{track} — 已应用用户编辑"
+  "status.edited": "{track} — 已应用用户编辑",
+  "settings.onlyTargetTranslation": "Show only the target-language translation (needs a DeepL key; provider translations, usually Chinese, are hidden)"
 }

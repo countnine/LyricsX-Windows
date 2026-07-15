@@ -84,5 +84,6 @@
   "status.notFound": "{track} — 歌詞が見つかりません",
   "status.wrong": "{track} — 歌詞が非表示（歌詞が間違っている）",
   "status.manual": "{track} — 手動選択（{service}）",
-  "status.edited": "{track} — ユーザーによる編集が反映されました"
+  "status.edited": "{track} — ユーザーによる編集が反映されました",
+  "settings.onlyTargetTranslation": "Show only the target-language translation (needs a DeepL key; provider translations, usually Chinese, are hidden)"
 }

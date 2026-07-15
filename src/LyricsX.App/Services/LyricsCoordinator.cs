@@ -45,7 +45,29 @@ public sealed class LyricsCoordinator : IDisposable
     /// <summary>DeepL target_lang (예: KO). 표시 우선순위 tr:{lang} → tr에도 사용.</summary>
     public string TargetLanguage { get; set; } = "KO";
 
+    /// <summary>대상 언어 번역만 표시(제공자의 다른 언어 번역 숨김). 대상=중국어면 제외(제공자 번역이 곧 중국어).</summary>
+    public bool ShowOnlyTargetTranslation { get; set; } = true;
+
     private string TargetLangLower => TargetLanguage.ToLowerInvariant();
+
+    /// <summary>대상 언어가 중국어(zh/zh-hans/zh-hant)인가 — 제공자 번역(중국어)을 그대로 쓴다.</summary>
+    private bool TargetIsChinese => TargetLangLower.StartsWith("zh", StringComparison.Ordinal);
+
+    /// <summary>
+    /// 표시할 번역 결정.
+    /// - 대상=중국어: 제공자 번역(중국어)을 그대로 우선(없으면 tr:{target}).
+    /// - "대상 언어만" 켬: tr:{target}(기계번역)만, 제공자의 다른 언어 번역은 숨김.
+    /// - 끔: tr:{target} → 제공자 tr 폴백(기존 동작).
+    /// </summary>
+    private string? ResolveDisplayTranslation(LineAttachments att)
+    {
+        if (TargetIsChinese) return att.Translation(null, TargetLangLower);
+        if (ShowOnlyTargetTranslation) return att.Translation(TargetLangLower);
+        return att.Translation(TargetLangLower, null);
+    }
+
+    /// <summary>표시 정책 변경 등으로 현재 라인을 즉시 다시 발행하도록 한다.</summary>
+    public void RefreshCurrentLine() => _lastLineIndex = int.MinValue;
 
     /// <summary>현재 라인 변경 (null = 가사 없음/재생 없음)</summary>
     public event Action<DisplayLine?>? CurrentLineChanged;
@@ -254,6 +276,8 @@ public sealed class LyricsCoordinator : IDisposable
     /// <summary>대상 언어 MT 보장 후 현재 라인 갱신 (캐시 히트면 즉시, 미스면 API 1회)</summary>
     private async Task TranslateAsync(Lyrics lyrics, CancellationToken ct)
     {
+        // 대상=중국어면 제공자 번역(중국어)을 그대로 쓰므로 DeepL을 거치지 않는다.
+        if (TargetIsChinese) return;
         if (Translation is not { IsEnabled: true } service) return;
         try
         {
@@ -298,10 +322,9 @@ public sealed class LyricsCoordinator : IDisposable
             else
             {
                 var line = lyrics.Lines[index];
-                // 표시 우선순위: tr:{target}(MT) → tr(제공자) 폴백
                 CurrentLineChanged?.Invoke(new DisplayLine(
                     line.Content,
-                    line.Attachments.Translation(TargetLangLower, null),
+                    ResolveDisplayTranslation(line.Attachments),
                     line.Attachments.GetInlineTimeTags(),
                     span));
             }

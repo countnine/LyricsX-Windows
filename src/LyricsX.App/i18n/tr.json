@@ -84,5 +84,6 @@
   "status.notFound": "{track} — şarkı sözleri bulunamadı",
   "status.wrong": "{track} — şarkı sözleri gizlenmiş (yanlış şarkı sözleri)",
   "status.manual": "{track} — manuel seçim ({service})",
-  "status.edited": "{track} — kullanıcı düzenlemesi uygulandı"
+  "status.edited": "{track} — kullanıcı düzenlemesi uygulandı",
+  "settings.onlyTargetTranslation": "Show only the target-language translation (needs a DeepL key; provider translations, usually Chinese, are hidden)"
 }

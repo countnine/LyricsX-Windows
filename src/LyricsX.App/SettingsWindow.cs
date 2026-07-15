@@ -174,6 +174,10 @@ public sealed class SettingsWindow : Window
             general.Children.Add(Header("settings.deepl.lang.header"));
             general.Children.Add(langBox);
 
+            // 번역 표시 정책: 대상 언어 번역만 표시(제공자의 다른 언어 번역 숨김)
+            var onlyTargetTransCheck = WrapCheck("settings.onlyTargetTranslation", settings.ShowOnlyTargetTranslation, new Thickness(0, 8, 0, 0));
+            general.Children.Add(onlyTargetTransCheck);
+
             // 동작 옵션 토글(일반 탭)
             var karaokeCheck = WrapCheck("settings.karaoke.check", settings.CharacterKaraoke, new Thickness(0, 14, 0, 0));
             var hideSameTransCheck = WrapCheck("settings.hideSameTranslation", settings.HideSameTranslation, new Thickness(0, 6, 0, 0));
@@ -347,6 +351,7 @@ public sealed class SettingsWindow : Window
                 settings.OutlineThickness = outlineSlider.Value;
                 settings.CharacterKaraoke = karaokeCheck.IsChecked == true;
                 settings.HideSameTranslation = hideSameTransCheck.IsChecked == true;
+                settings.ShowOnlyTargetTranslation = onlyTargetTransCheck.IsChecked == true;
                 settings.FadeAnimation = fadeCheck.IsChecked == true;
                 settings.HideOnMouseOver = hideOnHoverCheck.IsChecked == true;
                 settings.OverlayBackgroundEnabled = bgEnableCheck.IsChecked == true;

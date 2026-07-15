@@ -84,5 +84,6 @@
   "status.notFound": "{track} — letra não encontrada",
   "status.wrong": "{track} — letra oculta (letra incorreta)",
   "status.manual": "{track} — seleção manual ({service})",
-  "status.edited": "{track} — edição do usuário aplicada"
+  "status.edited": "{track} — edição do usuário aplicada",
+  "settings.onlyTargetTranslation": "Show only the target-language translation (needs a DeepL key; provider translations, usually Chinese, are hidden)"
 }

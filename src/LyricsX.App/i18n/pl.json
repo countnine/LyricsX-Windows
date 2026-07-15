@@ -84,5 +84,6 @@
   "status.notFound": "{track} — nie znaleziono tekstu piosenki",
   "status.wrong": "{track} — tekst piosenki ukryty (błędny tekst)",
   "status.manual": "{track} — wybór ręczny ({service})",
-  "status.edited": "{track} — wprowadzono zmiany użytkownika"
+  "status.edited": "{track} — wprowadzono zmiany użytkownika",
+  "settings.onlyTargetTranslation": "Show only the target-language translation (needs a DeepL key; provider translations, usually Chinese, are hidden)"
 }

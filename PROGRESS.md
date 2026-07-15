@@ -1,7 +1,12 @@
 # PROGRESS — LyricsX for Windows
 
-> **상태: v0.9.0 (2026-07-15)** — UI 다국어(19개어) + DeepL 키 보안 + 설정 UI 개편
+> **상태: v0.9.1 (2026-07-15)** — 대상 언어 번역만 표시(중국어 예외) + v0.9.0(다국어/보안/설정 UI)
 > 재개 방법: "이어서"라고 입력하면 아래 백로그부터 진행.
+
+## v0.9.1 추가분 (번역 표시 정책)
+- **"대상 언어 번역만 표시" 설정(기본 켬)** — 제공자(Kugou/QQ/NetEase)가 끼워 넣는 다른 언어 번역(주로 중국어)을 숨기고, DeepL 대상 언어 번역(`tr:{target}`)만 표시. **최초 설치·DeepL 키 없는 사용자는 원문만** 표시. `AppSettings.ShowOnlyTargetTranslation`, `LyricsCoordinator.ResolveDisplayTranslation`.
+- **중국어(ZH) 예외** — 대상 언어가 ZH면 제공자 번역이 곧 중국어이므로 DeepL을 거치지 않고 제공자 `tr`을 그대로 표시(`TargetIsChinese` → `TranslateAsync` 스킵 + 표시 우선). ZH 사용자는 키 없이도 중국어 번역 표시.
+- 우려/한계는 세션 기록 참조(ZH+제공자번역 없는 곡은 원문만, 제공자 tr 언어 태그 부재 등).
 
 ## v0.9.0 요약 (다국어 + 보안 + 설정 UI)
 - **UI 다국어 19개어**(en 참조 + ko 손번역 + DeepL 시드 17), 시스템 언어 기본·영어 폴백, 설정 언어 선택기 + GitHub 번역 기여 링크. 최초 실행 시 표시언어·번역대상언어를 시스템 언어로 기본 선택.

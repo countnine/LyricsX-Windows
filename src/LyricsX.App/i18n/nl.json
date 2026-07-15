@@ -84,5 +84,6 @@
   "status.notFound": "{track} — tekst niet gevonden",
   "status.wrong": "{track} — songtekst verborgen (verkeerde songtekst)",
   "status.manual": "{track} — handmatige selectie ({service})",
-  "status.edited": "{track} — wijziging door gebruiker toegepast"
+  "status.edited": "{track} — wijziging door gebruiker toegepast",
+  "settings.onlyTargetTranslation": "Show only the target-language translation (needs a DeepL key; provider translations, usually Chinese, are hidden)"
 }

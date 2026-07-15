@@ -84,5 +84,6 @@
   "status.notFound": "{track} — không tìm thấy lời bài hát",
   "status.wrong": "{track} — lời bài hát bị ẩn (lời bài hát sai)",
   "status.manual": "{track} — lựa chọn thủ công ({service})",
-  "status.edited": "{track} — đã áp dụng thay đổi của người dùng"
+  "status.edited": "{track} — đã áp dụng thay đổi của người dùng",
+  "settings.onlyTargetTranslation": "Show only the target-language translation (needs a DeepL key; provider translations, usually Chinese, are hidden)"
 }

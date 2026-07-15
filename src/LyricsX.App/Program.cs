@@ -41,6 +41,7 @@ internal static class Program
                 ManualOffsetSeconds = settings.ManualOffsetSeconds,
                 Translation = BuildTranslation(),
                 TargetLanguage = settings.EffectiveTargetLanguage,
+                ShowOnlyTargetTranslation = settings.ShowOnlyTargetTranslation,
                 Cache = new LyricsX.Core.Search.LyricsCacheStore(cacheDb),
             };
 
@@ -227,6 +228,8 @@ internal static class Program
                 {
                     coordinator.Translation = BuildTranslation();
                     coordinator.TargetLanguage = settings.EffectiveTargetLanguage;
+                    coordinator.ShowOnlyTargetTranslation = settings.ShowOnlyTargetTranslation;
+                    coordinator.RefreshCurrentLine(); // 표시 정책 변경 즉시 반영
                     overlay.ApplyStyle();
                     Log.Write($"[settings] 저장됨: lang={settings.EffectiveTargetLanguage}, key={(settings.DeeplApiKey is null ? "없음" : "설정됨")}");
                 });

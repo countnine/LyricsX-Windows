@@ -19,6 +19,7 @@
   "settings.outline.thickness": "Outline thickness: {value}",
   "settings.karaoke.check": "Character-level karaoke (supported: Kugou/QQ, etc.)",
   "settings.hideSameTranslation": "Hide translation identical to the original",
+  "settings.onlyTargetTranslation": "Show only the target-language translation (needs a DeepL key; provider translations, usually Chinese, are hidden)",
   "settings.fade": "Fade lyrics in and out",
   "settings.hideOnMouseOver": "Hide overlay on mouse-over (avoid blocking the screen)",
   "settings.background.show": "Show overlay background",

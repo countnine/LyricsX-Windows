@@ -47,6 +47,12 @@ public sealed class AppSettings
     /// <summary>번역이 원문과 같으면 번역 줄을 숨긴다(예: 영어곡을 EN으로 번역해 원문과 중복).</summary>
     public bool HideSameTranslation { get; set; } = true;
 
+    /// <summary>
+    /// 대상 언어 번역(DeepL)만 표시하고, 제공자가 끼워 넣은 다른 언어 번역(주로 중국어)은 숨긴다.
+    /// 기본 켬 → DeepL 키가 없으면 원문만 표시. 단, 대상이 중국어(ZH)면 제공자 번역이 곧 중국어이므로 그대로 표시.
+    /// </summary>
+    public bool ShowOnlyTargetTranslation { get; set; } = true;
+
     /// <summary>"틀린 가사"로 표시해 검색·표시를 막을 트랙 키 목록(정규화된 제목|아티스트).</summary>
     public List<string> SuppressedTracks { get; set; } = new();
 

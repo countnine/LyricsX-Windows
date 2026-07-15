@@ -84,5 +84,6 @@
   "status.notFound": "{track} — testo non trovato",
   "status.wrong": "{track} — testo nascosto (testo errato)",
   "status.manual": "{track} — selezione manuale ({service})",
-  "status.edited": "{track} — modifica dell'utente applicata"
+  "status.edited": "{track} — modifica dell'utente applicata",
+  "settings.onlyTargetTranslation": "Show only the target-language translation (needs a DeepL key; provider translations, usually Chinese, are hidden)"
 }

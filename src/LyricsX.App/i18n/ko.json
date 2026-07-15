@@ -19,6 +19,7 @@
   "settings.outline.thickness": "외곽선 두께: {value}",
   "settings.karaoke.check": "글자 단위 노래방 (지원 곡: Kugou/QQ 등)",
   "settings.hideSameTranslation": "원문과 같은 번역 숨기기",
+  "settings.onlyTargetTranslation": "대상 언어 번역만 표시 (DeepL 키 필요; 제공자 번역(주로 중국어)은 숨김)",
   "settings.fade": "가사 나타남/사라짐 페이드 효과",
   "settings.hideOnMouseOver": "마우스를 올리면 오버레이 숨기기(가림 방지)",
   "settings.background.show": "오버레이 배경 표시",
