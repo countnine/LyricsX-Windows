@@ -31,8 +31,18 @@ public sealed class LyricsCoordinator : IDisposable
     private CancellationTokenSource? _searchCts;
     private int _lastLineIndex = int.MinValue;
 
+    // 직렬화 표시 상태(StateChanged)용 현재 라인 스냅샷
+    private DisplayLine? _currentLine;
+    private DateTimeOffset? _currentLineStartedAt;
+
     public Lyrics? CurrentLyrics { get; private set; }
     public TrackInfo? CurrentTrack => _nowPlaying.CurrentTrack;
+
+    /// <summary>직렬화 가능한 현재 표시 상태(원격 디스플레이·바인딩용).</summary>
+    public PlaybackViewState CurrentState { get; private set; } = PlaybackViewState.Empty;
+
+    /// <summary>표시 상태 변경(라인/재생상태). 원격 브로드캐스트·VM 바인딩 대상.</summary>
+    public event Action<PlaybackViewState>? StateChanged;
 
     /// <summary>수동 싱크 오프셋(초). +면 가사가 빨라진다.</summary>
     public double ManualOffsetSeconds { get; set; }
@@ -101,6 +111,7 @@ public sealed class LyricsCoordinator : IDisposable
         {
             if (playing) _timer.Start();
             else _timer.Stop();
+            EmitState(); // 재생상태 변화를 표시 상태에 반영
         });
     }
 
@@ -119,7 +130,10 @@ public sealed class LyricsCoordinator : IDisposable
         _searchCts?.Cancel();
         CurrentLyrics = null;
         _lastLineIndex = int.MinValue;
+        _currentLine = null;
+        _currentLineStartedAt = null;
         CurrentLineChanged?.Invoke(null);
+        EmitState(); // 새 트랙(제목) 반영, 라인은 아직 없음
 
         if (track is null)
         {
@@ -212,7 +226,10 @@ public sealed class LyricsCoordinator : IDisposable
         _searchCts?.Cancel();
         CurrentLyrics = null;
         _lastLineIndex = int.MinValue;
+        _currentLine = null;
+        _currentLineStartedAt = null;
         CurrentLineChanged?.Invoke(null);
+        EmitState();
         StatusChanged?.Invoke(new LyricsStatus(LyricsStatusKind.Wrong, track.ToString()));
         SuppressedTracksChanged?.Invoke();
     }
@@ -313,21 +330,55 @@ public sealed class LyricsCoordinator : IDisposable
             _lastLineIndex = index;
             if (index < 0)
             {
+                _currentLine = null;
+                _currentLineStartedAt = null;
                 CurrentLineChanged?.Invoke(null);
             }
             else
             {
                 var line = lyrics.Lines[index];
-                CurrentLineChanged?.Invoke(new DisplayLine(
+                var display = new DisplayLine(
                     line.Content,
                     ResolveDisplayTranslation(line.Attachments),
                     line.Attachments.GetInlineTimeTags(),
-                    span));
+                    span);
+                _currentLine = display;
+                // 라인이 재생상 시작된 절대 시각(표시측 보간 앵커): 현재 - 라인 내 경과
+                _currentLineStartedAt = DateTimeOffset.Now - TimeSpan.FromSeconds(Math.Max(0, adjusted - start));
+                CurrentLineChanged?.Invoke(display);
             }
+            EmitState();
         }
 
         if (index >= 0)
             LineProgressChanged?.Invoke(adjusted - start); // 라인 시작 이후 경과(초)
+    }
+
+    /// <summary>현재 스냅샷으로 직렬화 표시 상태를 갱신·발행한다.</summary>
+    private void EmitState()
+    {
+        var track = _nowPlaying.CurrentTrack;
+        var controls = _nowPlaying.GetControls();
+        var line = _currentLine;
+
+        IReadOnlyList<KaraokeMark>? karaoke = null;
+        double? karaokeDuration = null;
+        if (line?.Karaoke is { } k)
+        {
+            karaoke = k.Tags.Select(t => new KaraokeMark(t.Index, t.Time)).ToList();
+            karaokeDuration = k.Duration;
+        }
+
+        CurrentState = new PlaybackViewState(
+            _nowPlaying.IsPlaying,
+            track?.Title, track?.Artist,
+            line?.Content, line?.Translation,
+            karaoke, karaokeDuration,
+            _currentLineStartedAt,
+            line?.LineSpanSeconds ?? 0,
+            controls.CanPrevious, controls.CanPlayPause, controls.CanNext);
+
+        StateChanged?.Invoke(CurrentState);
     }
 
     public void Dispose()
