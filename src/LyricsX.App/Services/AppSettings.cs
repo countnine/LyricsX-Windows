@@ -59,6 +59,15 @@ public sealed class AppSettings
     /// <summary>수동 싱크 오프셋(초). +면 가사가 빨라진다.</summary>
     public double ManualOffsetSeconds { get; set; }
 
+    /// <summary>
+    /// 재생 소스 선택. "auto" = 자동 감지, 그 외 = 특정 플레이어의 SourceAppUserModelId로 고정.
+    /// (macOS 버전의 플레이어 선택에 대응 — Windows에서는 SMTC 세션 단위로 고정)
+    /// </summary>
+    public string PlaybackSource { get; set; } = "auto";
+
+    /// <summary>자동 모드에서 브라우저(Firefox/Chrome 등)를 음악 소스로 포함할지. 기본 제외(영상 오인식 방지).</summary>
+    public bool IncludeBrowsers { get; set; }
+
     /// <summary>DeepL API 키(평문) — 앱 내에서만 사용, 파일엔 저장하지 않는다(암호화본만 저장).</summary>
     [JsonIgnore]
     public string? DeeplApiKey { get; set; }

@@ -64,18 +64,87 @@ internal static class Program
                 Log.Write($"[fullscreen] {(full ? "감지 → 오버레이 숨김" : "해제 → 오버레이 복원")}");
             };
 
+            // 재생 소스 선택 적용 (자동/특정 플레이어, 브라우저 제외 기본)
+            nowPlaying.SetSource(settings.PlaybackSource, settings.IncludeBrowsers);
+
             // 일시정지 중 오버레이 자동 숨김 (--demo에서는 재생 상태가 없으므로 제외)
             if (!args.Contains("--demo"))
             {
                 overlay.SetPausedSuppressed(!nowPlaying.IsPlaying);
                 nowPlaying.IsPlayingChanged += playing =>
                     app.Dispatcher.BeginInvoke(() => overlay.SetPausedSuppressed(!playing));
+
+                // 오버레이 좌측 재생 컨트롤(이전/재생·정지/다음). 마우스 오버 시에만 표시.
+                overlay.EnableMediaControls(
+                    controlsProvider: () => nowPlaying.GetControls(),
+                    playingProvider: () => nowPlaying.IsPlaying,
+                    onPrevious: () => _ = nowPlaying.SkipPreviousAsync(),
+                    onPlayPause: () => _ = nowPlaying.TogglePlayPauseAsync(),
+                    onNext: () => _ = nowPlaying.SkipNextAsync());
             }
 
             // ---- 트레이 메뉴 ----
             var trackItem = new MenuItem { Header = Loc.T("status.noTrack"), IsEnabled = false };
             var overlayToggle = new MenuItem { Header = Loc.T("tray.overlay.show"), IsCheckable = true, IsChecked = settings.OverlayVisible };
             var moveToggle = new MenuItem { Header = Loc.T("tray.overlay.moveMode"), IsCheckable = true };
+            var sourceMenu = new MenuItem { Header = Loc.T("tray.source") };
+
+            void ApplySource(string mode, bool includeBrowsers)
+            {
+                settings.PlaybackSource = mode;
+                settings.IncludeBrowsers = includeBrowsers;
+                settings.Save();
+                nowPlaying.SetSource(mode, includeBrowsers);
+                Log.Write($"[source] 소스={mode}, 브라우저포함={includeBrowsers}");
+            }
+
+            // 트레이 열릴 때마다 현재 감지된 SMTC 세션으로 소스 하위 메뉴를 재구성한다.
+            void RebuildSourceMenu()
+            {
+                sourceMenu.Items.Clear();
+                var mode = nowPlaying.SourceMode;
+
+                var autoItem = new MenuItem
+                {
+                    Header = Loc.T("tray.source.auto"),
+                    IsCheckable = true,
+                    IsChecked = string.Equals(mode, "auto", StringComparison.OrdinalIgnoreCase),
+                };
+                autoItem.Click += (_, _) => ApplySource("auto", settings.IncludeBrowsers);
+                sourceMenu.Items.Add(autoItem);
+
+                var browsersItem = new MenuItem
+                {
+                    Header = Loc.T("tray.source.includeBrowsers"),
+                    IsCheckable = true,
+                    IsChecked = settings.IncludeBrowsers,
+                };
+                browsersItem.Click += (_, _) => ApplySource(nowPlaying.SourceMode, browsersItem.IsChecked);
+                sourceMenu.Items.Add(browsersItem);
+
+                sourceMenu.Items.Add(new Separator());
+
+                var sources = nowPlaying.GetAvailableSources();
+                if (sources.Count == 0)
+                {
+                    sourceMenu.Items.Add(new MenuItem { Header = Loc.T("tray.source.none"), IsEnabled = false });
+                }
+                else
+                {
+                    foreach (var id in sources)
+                    {
+                        var captured = id;
+                        var item = new MenuItem
+                        {
+                            Header = NowPlayingService.IsBrowser(id) ? $"{id}  🌐" : id,
+                            IsCheckable = true,
+                            IsChecked = string.Equals(mode, id, StringComparison.OrdinalIgnoreCase),
+                        };
+                        item.Click += (_, _) => ApplySource(captured, settings.IncludeBrowsers);
+                        sourceMenu.Items.Add(item);
+                    }
+                }
+            }
             var offsetLabel = new MenuItem { IsEnabled = false };
             var offsetPlus = new MenuItem { Header = Loc.T("tray.offset.faster") };
             var offsetMinus = new MenuItem { Header = Loc.T("tray.offset.slower") };
@@ -269,6 +338,7 @@ internal static class Program
                 editItem.IsEnabled = hasLyrics;
                 exportItem.IsEnabled = hasLyrics;
                 wrongItem.IsEnabled = hasLyrics;
+                RebuildSourceMenu();
             };
             menu.Items.Add(trackItem);
             menu.Items.Add(searchItem);
@@ -278,6 +348,7 @@ internal static class Program
             menu.Items.Add(new Separator());
             menu.Items.Add(overlayToggle);
             menu.Items.Add(moveToggle);
+            menu.Items.Add(sourceMenu);
             menu.Items.Add(new Separator());
             menu.Items.Add(offsetLabel);
             menu.Items.Add(offsetPlus);
@@ -362,6 +433,7 @@ internal static class Program
             {
                 overlayToggle.Header = Loc.T("tray.overlay.show");
                 moveToggle.Header = Loc.T("tray.overlay.moveMode");
+                sourceMenu.Header = Loc.T("tray.source");
                 offsetPlus.Header = Loc.T("tray.offset.faster");
                 offsetMinus.Header = Loc.T("tray.offset.slower");
                 offsetReset.Header = Loc.T("tray.offset.reset");

@@ -34,6 +34,10 @@
   "tray.tooltip.status": "LyricsX\n{status}",
   "tray.overlay.show": "Show overlay",
   "tray.overlay.moveMode": "Move/resize overlay",
+  "tray.source": "Playback source",
+  "tray.source.auto": "Auto-detect",
+  "tray.source.includeBrowsers": "Include browsers (YouTube, etc.)",
+  "tray.source.none": "(no players detected)",
   "tray.offset.faster": "Lyrics earlier (+0.5s)",
   "tray.offset.slower": "Lyrics later (-0.5s)",
   "tray.offset.reset": "Reset offset",
@@ -61,6 +65,10 @@
 
   "lock.tooltip.locked": "Click: move/resize overlay",
   "lock.tooltip.unlocked": "Click: lock overlay (click-through)",
+
+  "controls.previous": "Previous",
+  "controls.playPause": "Play/Pause",
+  "controls.next": "Next",
 
   "search.title": "Search lyrics",
   "search.button": "Search",
