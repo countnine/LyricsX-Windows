@@ -34,3 +34,4 @@ Releases/
 # 로컬 테스트 빌드 산출물
 publish-test/
 publish-singlefile/
+.wrangler/
