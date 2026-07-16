@@ -1,7 +1,7 @@
 name: Notify homepage of release
 
 # When a release is published on this repo, immediately wake the homepage
-# (countnine/lyricsx-home) so its "Latest release: vX.Y.Z" label refreshes.
+# (countnine/musebase-home) so its "Latest release: vX.Y.Z" label refreshes.
 #
 # The homepage workflow ("Sync latest release version") listens for a
 # repository_dispatch of type `release-published` and resolves the newest
@@ -9,8 +9,8 @@ name: Notify homepage of release
 # fire that dispatch. This replaces the manual scripts/notify-homepage.ps1 step.
 #
 # Requires a repo secret HOMEPAGE_DISPATCH_TOKEN: a PAT with write access to
-# countnine/lyricsx-home (classic `repo` scope, or a fine-grained PAT scoped to
-# lyricsx-home with Contents: write). The default GITHUB_TOKEN cannot dispatch
+# countnine/musebase-home (classic `repo` scope, or a fine-grained PAT scoped to
+# musebase-home with Contents: write). The default GITHUB_TOKEN cannot dispatch
 # across repositories.
 
 on:
@@ -40,6 +40,6 @@ jobs:
             exit 1
           fi
           gh api --method POST \
-            repos/countnine/lyricsx-home/dispatches \
+            repos/countnine/musebase-home/dispatches \
             -f event_type=release-published
           echo "Triggered homepage version sync (repository_dispatch: release-published)."

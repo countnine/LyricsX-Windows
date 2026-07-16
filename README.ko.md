@@ -12,7 +12,7 @@
 
 <img src="docs/img/demo.gif" width="480" alt="Musebase 데모">
 
-🌐 <a href="https://countnine.github.io/lyricsx-home/"><b>소개 페이지 · 데모</b></a> · ⬇️ <a href="https://github.com/countnine/musebase/releases/latest"><b>다운로드</b></a>
+🌐 <a href="https://countnine.github.io/musebase-home/"><b>소개 페이지 · 데모</b></a> · ⬇️ <a href="https://github.com/countnine/musebase/releases/latest"><b>다운로드</b></a>
 
 </div>
 
