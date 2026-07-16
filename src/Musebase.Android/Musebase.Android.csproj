@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- .NET for Android 앱 헤드 (ADR-0003: Kotlin/Flutter 금지, 투코어 전략).
+         Musebase.sln에는 넣지 않는다 — android 워크로드가 없는 머신/CI의 메인 빌드 보호. -->
+    <TargetFramework>net8.0-android</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Musebase.Android</RootNamespace>
+    <AssemblyName>Musebase.Android</AssemblyName>
+
+    <!-- MediaSessionManager는 API 21+, 여유 있게 26(Android 8.0)을 최소로. -->
+    <SupportedOSPlatformVersion>26.0</SupportedOSPlatformVersion>
+
+    <ApplicationId>com.countnine.musebase</ApplicationId>
+    <ApplicationVersion>1</ApplicationVersion>
+    <ApplicationDisplayVersion>0.1.0</ApplicationDisplayVersion>
+
+    <!-- 스파이크는 사이드로드용 APK만 산출(AAB 불필요). -->
+    <AndroidPackageFormats>apk</AndroidPackageFormats>
+    <AndroidManifest>AndroidManifest.xml</AndroidManifest>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 엔진(net8.0 라이브러리)은 net8.0-android에서 참조 가능. 코어/엔진 수정 금지(골든룰). -->
+    <ProjectReference Include="..\Musebase.Engine\Musebase.Engine.csproj" />
+  </ItemGroup>
+
+</Project>
