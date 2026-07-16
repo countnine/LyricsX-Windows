@@ -14,6 +14,7 @@
 | `src/Musebase.Android/` | android 에이전트 | (예정) .NET for Android |
 | `src/Musebase.Browser/` | browser 에이전트 | (예정) ASP.NET WS 방송 + 웹 디스플레이 |
 | `apple/` | apple 에이전트 | (예정) Swift — 코드 비공유, `contracts/`로만 정렬 |
+| `backend/telemetry/` | core 에이전트 | 텔레메트리 수집 Worker(Cloudflare, `wrangler deploy`로 배포) |
 | `tests/`, `docs/`, `scripts/`, `tools/` | 공용 | 소유 경로에 대응하는 부분만 수정 |
 
 **골든룰: 코어(`Musebase.Core`/`Musebase.Engine`/`contracts/`)는 core 에이전트만 수정한다.**

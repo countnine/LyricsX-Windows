@@ -1,0 +1,11 @@
+# Musebase 텔레메트리 수집 Worker (Cloudflare Workers + D1)
+# 배포: backend/telemetry 에서 `wrangler deploy`
+# 설계·수집 항목: docs/adr/0004(예정) + TELEMETRY.md(예정)
+name = "musebase-telemetry"
+main = "src/worker.js"
+compatibility_date = "2026-07-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "musebase-telemetry"
+database_id = "7a4355b5-9813-421e-9b66-747651b60c87"
