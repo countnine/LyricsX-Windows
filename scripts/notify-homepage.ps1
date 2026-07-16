@@ -1,4 +1,4 @@
-# 홈페이지(countnine/lyricsx-home) 버전 표기 즉시 갱신 트리거
+# 홈페이지(countnine/musebase-home) 버전 표기 즉시 갱신 트리거
 #
 # 릴리스를 GitHub에 발행한 직후(`vpk upload github ... --publish` 성공 후) 실행하면,
 # 홈페이지 저장소의 "Sync latest release version" 워크플로우를 repository_dispatch로
@@ -19,10 +19,10 @@ if ($LASTEXITCODE -ne 0) {
     throw "gh CLI에 로그인되어 있지 않습니다. 'gh auth login' 후 다시 실행하세요."
 }
 
-gh api --method POST repos/countnine/lyricsx-home/dispatches -f event_type=release-published
+gh api --method POST repos/countnine/musebase-home/dispatches -f event_type=release-published
 if ($LASTEXITCODE -ne 0) {
-    throw "repository_dispatch 전송 실패 (토큰에 lyricsx-home 쓰기 권한이 있는지 확인)."
+    throw "repository_dispatch 전송 실패 (토큰에 musebase-home 쓰기 권한이 있는지 확인)."
 }
 
 Write-Host "홈페이지 버전 동기화를 트리거했습니다 (repository_dispatch: release-published)."
-Write-Host "진행 상황: https://github.com/countnine/lyricsx-home/actions"
+Write-Host "진행 상황: https://github.com/countnine/musebase-home/actions"

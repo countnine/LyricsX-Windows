@@ -12,7 +12,7 @@
 
 <img src="docs/img/demo.gif" width="480" alt="Musebase demo">
 
-🌐 <a href="https://countnine.github.io/lyricsx-home/"><b>Homepage &amp; demo</b></a> · ⬇️ <a href="https://github.com/countnine/musebase/releases/latest"><b>Download</b></a>
+🌐 <a href="https://countnine.github.io/musebase-home/"><b>Homepage &amp; demo</b></a> · ⬇️ <a href="https://github.com/countnine/musebase/releases/latest"><b>Download</b></a>
 
 </div>
 
