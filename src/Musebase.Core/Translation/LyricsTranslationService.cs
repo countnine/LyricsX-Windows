@@ -1,5 +1,18 @@
 namespace Musebase.Core.Translation;
 
+/// <summary>번역 파이프라인 1회 실행 통계(텔레메트리·진단용). 곡 정보는 담지 않는다.</summary>
+public sealed class TranslationRunStats
+{
+    /// <summary>이번 실행에서 대상 언어 번역이 필요했던 라인 수(캐시 적중 + API, 중복 라인 포함).</summary>
+    public int LinesNeeded { get; internal set; }
+
+    /// <summary>그중 라인 캐시로 채운 수.</summary>
+    public int CacheHits { get; internal set; }
+
+    /// <summary>캐시 적중률(0–100 정수). 필요 라인이 없으면 0.</summary>
+    public int CacheHitPct => LinesNeeded == 0 ? 0 : (int)Math.Round(CacheHits * 100.0 / LinesNeeded);
+}
+
 /// <summary>
 /// 가사 이중언어 보장 서비스.
 ///
@@ -25,10 +38,18 @@ public sealed class LyricsTranslationService
     public bool IsEnabled => _translator is not null;
 
     /// <summary>
+    /// 이 서비스를 만든 번역 엔진 id(레지스트리 id, 텔레메트리용).
+    /// 팩토리(LyricsEngineFactory)가 구성값으로 채운다. 기본 "none".
+    /// </summary>
+    public string EngineId { get; init; } = TranslatorRegistry.None;
+
+    /// <summary>
     /// 가사에 대상 언어 번역을 채운다. 반환값: 변경된 라인 수.
     /// 실패(네트워크/키 오류)는 조용히 0 — 기능 강등이지 오류가 아니다.
+    /// <paramref name="stats"/>를 주면 필요 라인 수·캐시 적중을 집계한다(텔레메트리용).
     /// </summary>
-    public async Task<int> EnsureTranslatedAsync(Lyrics lyrics, string targetLang, CancellationToken ct = default)
+    public async Task<int> EnsureTranslatedAsync(
+        Lyrics lyrics, string targetLang, CancellationToken ct = default, TranslationRunStats? stats = null)
     {
         if (_translator is null) return 0;
 
@@ -45,10 +66,13 @@ public sealed class LyricsTranslationService
             if (string.IsNullOrWhiteSpace(line.Content)) continue;
             if (line.Attachments[tag] is not null) continue;
 
+            if (stats is not null) stats.LinesNeeded++;
+
             if (_cache.Get(line.Content, targetLang) is { } cached)
             {
                 line.Attachments[tag] = cached;
                 changed++;
+                if (stats is not null) stats.CacheHits++;
                 continue;
             }
 

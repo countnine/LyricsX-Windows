@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Musebase Android 스파이크 매니페스트(템플릿).
+  - <uses-sdk>는 csproj의 SupportedOSPlatformVersion에서 생성된다.
+  - MediaListenerService의 <service> 선언(BIND_NOTIFICATION_LISTENER_SERVICE 권한 +
+    android.service.notification.NotificationListenerService 인텐트 필터)과
+    MainActivity의 <activity> 선언은 Services/MediaListenerService.cs, MainActivity.cs의
+    [Service]/[IntentFilter]/[Activity] 특성에서 생성되어 빌드 시 이 파일에 병합된다.
+    (.NET for Android 관례 — 수동 선언과 특성 선언을 중복하면 병합 충돌이 난다.)
+  - 알림 접근(notification access)은 설치형 권한이 아니라 사용자가 시스템 설정에서
+    직접 켜는 특수 권한이므로 <uses-permission>이 필요 없다.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <application
+      android:label="Musebase"
+      android:allowBackup="true"
+      android:supportsRtl="true" />
+</manifest>

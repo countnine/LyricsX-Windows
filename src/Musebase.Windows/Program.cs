@@ -29,6 +29,34 @@ internal static class Program
             Loc.Initialize(settings.UiLanguage); // UI 다국어: 창 생성 전에 언어 확정
             var nowPlaying = await NowPlayingService.CreateAsync();
 
+            // ---- 텔레메트리(익명 옵트인, ADR-0004) ----
+            // 동의가 꺼져 있으면 Track이 즉시 무시(수집 자체 안 함). 큐·업로드는 클라이언트가 관리.
+            var telemetry = new TelemetryClient(settings, Log.Write, appSessionProps: () =>
+                new Dictionary<string, object?>
+                {
+                    ["uiLang"] = Loc.CurrentCode,
+                    ["targetLang"] = settings.EffectiveTargetLanguage,
+                    ["engine"] = settings.EffectiveTranslationEngine,
+                    ["sources"] = settings.EnabledLyricsSources.ToArray(),
+                    ["sourceMode"] = settings.PlaybackSource,
+                    ["osVersion"] = Environment.OSVersion.Version.Build >= 22000 ? "Windows 11" : "Windows 10",
+                });
+            telemetry.StartUploader();
+
+            // 비처리 예외 → error 이벤트(kind/frame/fatal만 — 메시지 본문·경로 금지)
+            app.DispatcherUnhandledException += (_, e) =>
+            {
+                telemetry.TrackError(e.Exception, fatal: true);
+                telemetry.FlushPendingToDisk(); // 프로세스 종료 전 큐 보존(다음 실행에서 업로드)
+            };
+            AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+            {
+                if (e.ExceptionObject is Exception ex) telemetry.TrackError(ex, e.IsTerminating);
+                telemetry.FlushPendingToDisk();
+            };
+
+            // 재생 소스 앱 통계는 코디네이터(엔진 계측)가 발화하고, 클라이언트가 appId별 하루 1회로 디바운스한다.
+
             // 번역: SQLite 라인 캐시 + 레지스트리에서 선택된 엔진(키 없으면 무키 무료로 폴백)
             var cacheDb = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -52,7 +80,8 @@ internal static class Program
 
             // 공유 조합 팩토리로 코디네이터 조립(동일 조합을 Android/서버가 재사용)
             var coordinator = LyricsEngineFactory.Create(
-                nowPlaying, new WpfEngineDispatcher(app.Dispatcher), CurrentConfig(), translationCache, Log.Write);
+                nowPlaying, new WpfEngineDispatcher(app.Dispatcher), CurrentConfig(), translationCache, Log.Write,
+                telemetry: telemetry); // 엔진 계측(lyrics_search/translation/wrong_lyrics/…) 활성화
 
             // "틀린 가사" 억제 목록을 설정에서 복원하고 변경 시 영속화
             foreach (var key in settings.SuppressedTracks) coordinator.SuppressedTrackKeys.Add(key);
@@ -87,9 +116,9 @@ internal static class Program
                 overlay.EnableMediaControls(
                     controlsProvider: () => nowPlaying.GetControls(),
                     playingProvider: () => nowPlaying.IsPlaying,
-                    onPrevious: () => _ = nowPlaying.SkipPreviousAsync(),
-                    onPlayPause: () => _ = nowPlaying.TogglePlayPauseAsync(),
-                    onNext: () => _ = nowPlaying.SkipNextAsync());
+                    onPrevious: () => { telemetry.CountFeature("mediaControls"); _ = nowPlaying.SkipPreviousAsync(); },
+                    onPlayPause: () => { telemetry.CountFeature("mediaControls"); _ = nowPlaying.TogglePlayPauseAsync(); },
+                    onNext: () => { telemetry.CountFeature("mediaControls"); _ = nowPlaying.SkipNextAsync(); });
             }
 
             // ---- 트레이 메뉴 ----
@@ -177,7 +206,11 @@ internal static class Program
                 }
             };
             var searchItem = new MenuItem { Header = Loc.T("tray.search") };
-            searchItem.Click += (_, _) => new SearchWindow(coordinator).Show();
+            searchItem.Click += (_, _) =>
+            {
+                telemetry.CountFeature("search");
+                new SearchWindow(coordinator).Show();
+            };
 
             // ---- 현재 가사 편집 / 내보내기 ----
             var editItem = new MenuItem { Header = Loc.T("tray.edit") };
@@ -187,6 +220,7 @@ internal static class Program
             editItem.Click += (_, _) =>
             {
                 if (coordinator.CurrentLyrics is not { } lyrics || coordinator.CurrentTrack is not { } track) return;
+                telemetry.CountFeature("edit");
                 if (editorWindow is { IsLoaded: true })
                 {
                     editorWindow.Activate();
@@ -208,6 +242,7 @@ internal static class Program
                     FileName = SanitizeFileName($"{track.Artist} - {track.Title}") + ".lrc",
                 };
                 if (dialog.ShowDialog() != true) return;
+                telemetry.CountFeature("export");
                 try
                 {
                     // 이중언어: [mm:ss.xx]원문【번역】 (표준 플레이어 호환).
@@ -334,6 +369,7 @@ internal static class Program
 
             void AdjustOffset(double? delta)
             {
+                telemetry.CountFeature("offset");
                 coordinator.ManualOffsetSeconds = delta is { } d ? coordinator.ManualOffsetSeconds + d : 0;
                 settings.ManualOffsetSeconds = coordinator.ManualOffsetSeconds;
                 settings.Save();
@@ -388,6 +424,7 @@ internal static class Program
             app.Exit += (_, _) =>
             {
                 tray.Dispose();
+                telemetry.Dispose(); // 세션 feature_use 카운터를 큐로 보존(다음 실행에서 업로드)
                 settings.Save();
             };
 
@@ -482,6 +519,10 @@ internal static class Program
 
             coordinator.Start(); // 배선 완료 후 시작 (캐시/번역/상태 이벤트 유효)
             Log.Write("=== Musebase 시작 ===");
+
+            // 텔레메트리 동의 다이얼로그(최초 1회, 기본 모두 꺼짐 = 미수집)
+            if (!settings.TelemetryConsentAsked)
+                new TelemetryConsentWindow(settings).Show();
 
             // 시작 시 백그라운드 업데이트 확인(비침습: 발견 시 트레이 메뉴 라벨만 갱신)
             _ = RunUpdateCheckAsync(userInitiated: false);
