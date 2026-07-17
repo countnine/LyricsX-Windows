@@ -31,6 +31,10 @@ public sealed class LyricsCoordinator : IDisposable
     private CancellationTokenSource? _searchCts;
     private int _lastLineIndex = int.MinValue;
 
+    // 텔레메트리 발화 제어: playback_source는 같은 트랙 반복 발화 방지, translation은 곡당 1회
+    private string? _lastPlaybackSourceKey;
+    private bool _translationReported;
+
     // 직렬화 표시 상태(StateChanged)용 현재 라인 스냅샷
     private DisplayLine? _currentLine;
     private DateTimeOffset? _currentLineStartedAt;
@@ -49,6 +53,12 @@ public sealed class LyricsCoordinator : IDisposable
 
     /// <summary>진단 로그 싱크(선택). 소비자가 Log.Write 등을 주입.</summary>
     public Action<string>? Log { get; set; }
+
+    /// <summary>
+    /// 익명 텔레메트리 싱크(ADR-0004, 기본 Noop=무수집). 이벤트 type/props의 단일 진실은
+    /// contracts/telemetry-events.md. ② 이벤트(곡 정보 포함)의 동의 필터링은 구현(플랫폼) 책임.
+    /// </summary>
+    public ITelemetry Telemetry { get; set; } = NoopTelemetry.Instance;
 
     /// <summary>기계번역 서비스 (키 미설정 시 IsEnabled=false로 무동작)</summary>
     public LyricsTranslationService? Translation { get; set; }
@@ -132,6 +142,7 @@ public sealed class LyricsCoordinator : IDisposable
         _lastLineIndex = int.MinValue;
         _currentLine = null;
         _currentLineStartedAt = null;
+        _translationReported = false; // translation 이벤트는 곡당 1회
         CurrentLineChanged?.Invoke(null);
         EmitState(); // 새 트랙(제목) 반영, 라인은 아직 없음
 
@@ -139,6 +150,18 @@ public sealed class LyricsCoordinator : IDisposable
         {
             StatusChanged?.Invoke(new LyricsStatus(LyricsStatusKind.NoTrack));
             return;
+        }
+
+        // playback_source: 재생 소스 앱 id(곡 정보 없음). 같은 트랙의 반복 통지(SMTC 메타 재발화 등)는
+        // 억제하고, 하루 앱별 1회 디바운스는 클라이언트(플랫폼 ITelemetry 구현) 책임.
+        var playbackKey = $"{track.SourceAppId}|{LyricsCacheStore.MakeKey(track.Title, track.Artist)}";
+        if (playbackKey != _lastPlaybackSourceKey)
+        {
+            _lastPlaybackSourceKey = playbackKey;
+            Telemetry.Track(TelemetryEvents.PlaybackSource, new Dictionary<string, object?>
+            {
+                ["appId"] = track.SourceAppId,
+            });
         }
 
         // "틀린 가사"로 표시된 곡은 검색·표시하지 않는다
@@ -154,6 +177,14 @@ public sealed class LyricsCoordinator : IDisposable
             CurrentLyrics = cached;
             _lastLineIndex = int.MinValue;
             StatusChanged?.Invoke(new LyricsStatus(LyricsStatusKind.Cache, track.ToString(), cached.Metadata.ServiceName ?? ""));
+            // lyrics_search(캐시 적중): 네트워크 검색이 없었으므로 perSource는 빈 객체
+            Telemetry.Track(TelemetryEvents.LyricsSearch, new Dictionary<string, object?>
+            {
+                ["winner"] = SourceIdOf(cached.Metadata.ServiceName),
+                ["perSource"] = new Dictionary<string, object?>(),
+                ["cached"] = true,
+                ["cleanedQueryUsed"] = false,
+            });
             var cacheCts = new CancellationTokenSource();
             _searchCts = cacheCts;
             await TranslateAsync(cached, cacheCts.Token); // 언어 변경 시 보충 번역
@@ -168,9 +199,10 @@ public sealed class LyricsCoordinator : IDisposable
         {
             var request = LyricsSearchRequest.ByInfo(
                 track.Title, track.Artist, track.Duration?.TotalSeconds ?? 0, limit: 3);
+            var diagnostics = new SearchDiagnostics();
 
             // 첫 결과 우선 표시 후 더 좋은 후보로 교체 (지연 체감 최소화)
-            await foreach (var lyrics in _search.SearchAsync(request, cts.Token))
+            await foreach (var lyrics in _search.SearchAsync(request, cts.Token, diagnostics))
             {
                 if (cts.Token.IsCancellationRequested) return;
                 if (CurrentLyrics is null || lyrics.Quality() > CurrentLyrics.Quality())
@@ -183,9 +215,22 @@ public sealed class LyricsCoordinator : IDisposable
                 }
             }
 
+            // 검색 1회 완료 — 트랙이 교체됐으면(취소) 발화하지 않는다
+            if (!cts.Token.IsCancellationRequested)
+                TrackLyricsSearch(request, diagnostics);
+
             if (CurrentLyrics is null)
             {
                 StatusChanged?.Invoke(new LyricsStatus(LyricsStatusKind.NotFound, track.ToString()));
+                if (!cts.Token.IsCancellationRequested)
+                {
+                    // ② 품질 리포트 — 곡 정보 포함. 동의 필터링은 ITelemetry 구현 책임.
+                    Telemetry.Track(TelemetryEvents.LyricsNotFound, new Dictionary<string, object?>
+                    {
+                        ["title"] = track.Title,
+                        ["artist"] = track.Artist,
+                    });
+                }
             }
             else if (!cts.Token.IsCancellationRequested)
             {
@@ -218,6 +263,14 @@ public sealed class LyricsCoordinator : IDisposable
     public void MarkWrongLyrics()
     {
         if (CurrentTrack is not { } track) return;
+
+        // ② 품질 리포트 — 채택됐던 소스 id는 지우기 전에 확보. 동의 필터링은 ITelemetry 구현 책임.
+        Telemetry.Track(TelemetryEvents.WrongLyrics, new Dictionary<string, object?>
+        {
+            ["title"] = track.Title,
+            ["artist"] = track.Artist,
+            ["source"] = SourceIdOf(CurrentLyrics?.Metadata.ServiceName),
+        });
 
         SuppressedTrackKeys.Add(LyricsCacheStore.MakeKey(track.Title, track.Artist));
         try { Cache?.Remove(track.Title, track.Artist); }
@@ -294,15 +347,64 @@ public sealed class LyricsCoordinator : IDisposable
         if (Translation is not { IsEnabled: true } service) return;
         try
         {
-            var changed = await service.EnsureTranslatedAsync(lyrics, TargetLanguage, ct);
+            var stats = new TranslationRunStats();
+            var changed = await service.EnsureTranslatedAsync(lyrics, TargetLanguage, ct, stats);
             if (changed > 0 && ReferenceEquals(CurrentLyrics, lyrics))
                 _lastLineIndex = int.MinValue; // 번역 반영 위해 현재 라인 재발행
+
+            // translation: 번역이 실제로 필요했던 첫 완료 시점에 곡당 1회
+            if (!_translationReported && stats.LinesNeeded > 0)
+            {
+                _translationReported = true;
+                Telemetry.Track(TelemetryEvents.Translation, new Dictionary<string, object?>
+                {
+                    ["engine"] = service.EngineId,
+                    ["cacheHitPct"] = stats.CacheHitPct,
+                    ["linesBucket"] = LinesBucket(stats.LinesNeeded),
+                });
+            }
         }
         catch (OperationCanceledException)
         {
             // 트랙 교체됨
         }
     }
+
+    /// <summary>lyrics_search 발화(계약 ① — 곡 정보 없음): 소스별 히트/지연 + 채택 소스 + 정제 검색어 사용 여부.</summary>
+    private void TrackLyricsSearch(LyricsSearchRequest request, SearchDiagnostics diagnostics)
+    {
+        var winner = CurrentLyrics;
+
+        var perSource = new Dictionary<string, object?>();
+        foreach (var (serviceName, stat) in diagnostics.PerSource)
+        {
+            perSource[SourceIdOf(serviceName)] = new Dictionary<string, object?>
+            {
+                ["hit"] = stat.Hit,
+                ["latencyMs"] = stat.LatencyMs,
+            };
+        }
+
+        // Metadata.Request는 실제 사용된 요청 — 원본과 검색어가 다르면 정제 변형에서 얻은 결과
+        var cleanedQueryUsed = winner?.Metadata.Request is { } used && !Equals(used.Term, request.Term);
+
+        Telemetry.Track(TelemetryEvents.LyricsSearch, new Dictionary<string, object?>
+        {
+            ["winner"] = winner is null ? "none" : SourceIdOf(winner.Metadata.ServiceName),
+            ["perSource"] = perSource,
+            ["cached"] = false,
+            ["cleanedQueryUsed"] = cleanedQueryUsed,
+        });
+    }
+
+    /// <summary>제공자 ServiceName → 레지스트리 소스 id. 미등록(사용자 편집 등)은 소문자 이름, 비면 "none".</summary>
+    private static string SourceIdOf(string? serviceName) =>
+        string.IsNullOrEmpty(serviceName) ? "none"
+        : LyricsSourceRegistry.Find(serviceName)?.Id ?? serviceName.ToLowerInvariant();
+
+    /// <summary>translation.linesBucket 버킷팅(contracts/telemetry-events.md).</summary>
+    private static string LinesBucket(int lines) =>
+        lines <= 10 ? "1-10" : lines <= 50 ? "11-50" : "51+";
 
     private void Tick()
     {
