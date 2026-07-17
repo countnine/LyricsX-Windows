@@ -27,7 +27,7 @@ public sealed class AppSettings
 
     // ---- 오버레이 스타일 (#RRGGBB) ----
     public string TextColor { get; set; } = "#FFFFFF";
-    public string KaraokeColor { get; set; } = "#1DB954";
+    public string KaraokeColor { get; set; } = "#FFEB3B";
     public string TranslationColor { get; set; } = "#E8E8E8";
     public string OutlineColor { get; set; } = "#000000";
     public double OutlineThickness { get; set; } = 3.0;
@@ -42,7 +42,10 @@ public sealed class AppSettings
     public string OverlayBackgroundColor { get; set; } = "#000000";
 
     /// <summary>오버레이 배경 불투명도(0=완전 투명 ~ 1=불투명).</summary>
-    public double OverlayBackgroundOpacity { get; set; } = 0.4;
+    public double OverlayBackgroundOpacity { get; set; } = 0.25;
+
+    /// <summary>오버레이 배경(반투명 판)의 모서리 라운드 반경(DIP).</summary>
+    public double OverlayCornerRadius { get; set; } = 12;
 
     /// <summary>오버레이 위에 마우스를 올리면 가사·오버레이를 잠시 숨긴다(가림 방지).</summary>
     public bool HideOnMouseOver { get; set; }
@@ -103,6 +106,12 @@ public sealed class AppSettings
 
     /// <summary>LibreTranslate 엔드포인트(자체호스팅 등). 비면 레지스트리 기본값 사용.</summary>
     public string? LibreTranslateEndpoint { get; set; }
+
+    /// <summary>
+    /// 주 번역 엔진(DeepL 등) 실패 시 LibreTranslate 공개 서버로 자동 전환한다.
+    /// 켜면 가사 텍스트가 LibreTranslate 공개 서버로 전송될 수 있다(주의). 기본 꺼짐.
+    /// </summary>
+    public bool TranslationFallbackToLibre { get; set; }
 
     /// <summary>
     /// 실효 번역 엔진. 명시값이 있으면 그대로, 없으면 DeepL 키가 있으면 deepl(기존 사용자 보존),

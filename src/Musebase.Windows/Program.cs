@@ -73,15 +73,48 @@ internal static class Program
                 settings.EffectiveTargetLanguage,
                 settings.ShowOnlyTargetTranslation,
                 settings.ManualOffsetSeconds,
-                cacheDb);
+                cacheDb,
+                // 폴백 켬 + 주 엔진이 libretranslate가 아닐 때만 LibreTranslate로 자동 전환.
+                TranslationFallbackEngineId:
+                    settings.TranslationFallbackToLibre
+                    && !string.Equals(settings.EffectiveTranslationEngine, "libretranslate", StringComparison.OrdinalIgnoreCase)
+                        ? "libretranslate" : null);
 
             Log.Write($"[sources] 활성 가사 소스: {string.Join(", ", settings.EnabledLyricsSources)}");
             Log.Write($"[translate] 엔진={settings.EffectiveTranslationEngine}");
 
+            // 트레이/미니창은 아래에서 생성되지만, 번역 실패 콜백·표시 동기화가 이들을 참조하므로 선언만 먼저.
+            H.NotifyIcon.TaskbarIcon? tray = null;
+            MiniWindow? miniWindow = null;
+
+            // 번역 실패 사용자 힌트: 같은 kind는 세션 1회만(곡마다 스팸 금지). 로그는 매 실패 기록.
+            var reportedFailureKinds = new HashSet<Musebase.Core.Translation.TranslatorFailureKind>();
+            static string LocalizeFailureHint(Musebase.Core.Translation.TranslatorFailureKind kind) => kind switch
+            {
+                Musebase.Core.Translation.TranslatorFailureKind.Quota => Loc.T("translate.fail.quota"),
+                Musebase.Core.Translation.TranslatorFailureKind.Auth => Loc.T("translate.fail.auth"),
+                Musebase.Core.Translation.TranslatorFailureKind.RateLimit => Loc.T("translate.fail.rate"),
+                Musebase.Core.Translation.TranslatorFailureKind.Server => Loc.T("translate.fail.server"),
+                Musebase.Core.Translation.TranslatorFailureKind.Network => Loc.T("translate.fail.network"),
+                _ => Loc.T("translate.fail.other"),
+            };
+            void OnTranslationFailure(Musebase.Core.Translation.TranslatorFailure f)
+            {
+                Log.Write($"[translate] 실패: engine={f.EngineId} status={(f.HttpStatus?.ToString() ?? "-")} kind={f.Kind}");
+                if (!reportedFailureKinds.Add(f.Kind)) return; // 세션당 kind 1회만 사용자 힌트
+                var hint = LocalizeFailureHint(f.Kind);
+                app.Dispatcher.BeginInvoke(() =>
+                {
+                    if (tray is { } t) t.ToolTipText = Loc.T("tray.tooltip.status", ("status", hint));
+                    miniWindow?.SetStatus(hint);
+                });
+            }
+
             // 공유 조합 팩토리로 코디네이터 조립(동일 조합을 Android/서버가 재사용)
             var coordinator = LyricsEngineFactory.Create(
                 nowPlaying, new WpfEngineDispatcher(app.Dispatcher), CurrentConfig(), translationCache, Log.Write,
-                telemetry: telemetry); // 엔진 계측(lyrics_search/translation/wrong_lyrics/…) 활성화
+                telemetry: telemetry, // 엔진 계측(lyrics_search/translation/wrong_lyrics/…) 활성화
+                onTranslationFailure: OnTranslationFailure); // 번역 실패 로깅·힌트
 
             // "틀린 가사" 억제 목록을 설정에서 복원하고 변경 시 영속화
             foreach (var key in settings.SuppressedTracks) coordinator.SuppressedTrackKeys.Add(key);
@@ -330,7 +363,7 @@ internal static class Program
             updateItem.Click += async (_, _) => await RunUpdateCheckAsync(userInitiated: true);
 
             SettingsWindow? settingsWindow = null;
-            settingsItem.Click += (_, _) =>
+            void OpenSettings()
             {
                 if (settingsWindow is { IsLoaded: true })
                 {
@@ -340,32 +373,55 @@ internal static class Program
                 settingsWindow = new SettingsWindow(settings, onSaved: () =>
                 {
                     var cfg = CurrentConfig();
-                    coordinator.Translation = LyricsEngineFactory.BuildTranslation(cfg, translationCache);
+                    reportedFailureKinds.Clear(); // 엔진/폴백 변경 시 힌트를 다시 안내할 수 있게 초기화
+                    coordinator.Translation = LyricsEngineFactory.BuildTranslation(cfg, translationCache, OnTranslationFailure);
                     coordinator.TargetLanguage = cfg.TargetLanguage;
                     coordinator.ShowOnlyTargetTranslation = cfg.ShowOnlyTargetTranslation;
                     coordinator.RefreshCurrentLine(); // 표시 정책 변경 즉시 반영
                     overlay.ApplyStyle();
-                    Log.Write($"[settings] 저장됨: engine={cfg.TranslationEngineId}, lang={cfg.TargetLanguage}");
-                });
+                    Log.Write($"[settings] 저장됨: engine={cfg.TranslationEngineId}, lang={cfg.TargetLanguage}, fallback={cfg.TranslationFallbackEngineId ?? "-"}");
+                },
+                onCheckUpdates: () => _ = RunUpdateCheckAsync(userInitiated: true));
                 settingsWindow.Show();
-            };
+            }
+            settingsItem.Click += (_, _) => OpenSettings();
 
             void UpdateOffsetLabel() =>
                 offsetLabel.Header = Loc.T("tray.offset.label", ("value", coordinator.ManualOffsetSeconds.ToString("+0.0;-0.0;0")));
             UpdateOffsetLabel();
 
-            overlayToggle.Click += (_, _) =>
+            // 오버레이 표시 상태를 트레이·미니창과 동기화하며 설정에 저장.
+            void SetOverlayVisible(bool visible)
             {
-                settings.OverlayVisible = overlayToggle.IsChecked;
-                overlay.SetUserVisible(overlayToggle.IsChecked);
+                settings.OverlayVisible = visible;
+                overlay.SetUserVisible(visible);
                 settings.Save();
-            };
+                overlayToggle.IsChecked = visible;
+                miniWindow?.SyncOverlayVisible(visible);
+            }
+            // 미니창(작업표시줄)에서 오버레이 되살리기 — 사용자 숨김/일시정지/가림방지 억제를 해제.
+            void ReviveOverlay()
+            {
+                overlay.ReviveVisible();
+                settings.OverlayVisible = true;
+                settings.Save();
+                overlayToggle.IsChecked = true;
+                miniWindow?.SyncOverlayVisible(true);
+            }
+            // 종료(트레이/미니창 공통): 미니창 실제 닫힘 허용 후 앱 종료.
+            void ExitApp()
+            {
+                miniWindow?.CloseForExit();
+                app.Shutdown();
+            }
+
+            overlayToggle.Click += (_, _) => SetOverlayVisible(overlayToggle.IsChecked);
             moveToggle.Click += (_, _) => overlay.SetMoveMode(moveToggle.IsChecked);
             overlay.MoveModeChanged += moveMode => moveToggle.IsChecked = moveMode; // 자물쇠 버튼과 동기화
             offsetPlus.Click += (_, _) => AdjustOffset(0.5);
             offsetMinus.Click += (_, _) => AdjustOffset(-0.5);
             offsetReset.Click += (_, _) => AdjustOffset(null);
-            exitItem.Click += (_, _) => app.Shutdown();
+            exitItem.Click += (_, _) => ExitApp();
 
             void AdjustOffset(double? delta)
             {
@@ -406,9 +462,10 @@ internal static class Program
             menu.Items.Add(settingsItem);
             menu.Items.Add(exitItem);
 
-            var tray = new TaskbarIcon
+            var appIcon = CreateTrayIcon(); // 트레이·미니창이 공유하는 런타임 아이콘(녹색 원 + M)
+            tray = new TaskbarIcon
             {
-                Icon = CreateTrayIcon(),
+                Icon = appIcon,
                 ToolTipText = Loc.T("tray.tooltip.version", ("version", updater.CurrentVersion.ToString())),
                 ContextMenu = menu,
             };
@@ -421,9 +478,24 @@ internal static class Program
             {
                 Log.Write($"[tray] ForceCreate 실패: {e.Message}");
             }
+
+            // ---- 작업표시줄 상주 미니창 ----
+            miniWindow = new MiniWindow(
+                appIcon,
+                isOverlayVisible: () => settings.OverlayVisible,
+                setOverlayVisible: SetOverlayVisible,
+                reviveOverlay: ReviveOverlay,
+                openSettings: OpenSettings,
+                exit: ExitApp);
+            if (coordinator.CurrentStatus is { } cs) miniWindow.SetStatus(LocalizeStatus(cs));
+            // 포커스를 뺏지 않도록 최소화 상태로 작업표시줄에 상주(오버레이는 별도로 표시됨).
+            miniWindow.WindowState = WindowState.Minimized;
+            miniWindow.Show();
+
             app.Exit += (_, _) =>
             {
                 tray.Dispose();
+                appIcon.Dispose();
                 telemetry.Dispose(); // 세션 feature_use 카운터를 큐로 보존(다음 실행에서 업로드)
                 settings.Save();
             };
@@ -448,7 +520,8 @@ internal static class Program
             {
                 var text = LocalizeStatus(status);
                 trackItem.Header = text;
-                tray.ToolTipText = Loc.T("tray.tooltip.status", ("status", text));
+                if (tray is { } t) t.ToolTipText = Loc.T("tray.tooltip.status", ("status", text));
+                miniWindow?.SetStatus(text);
                 Log.Write($"[status] {text}");
             };
             coordinator.CurrentLineChanged += line =>
@@ -512,7 +585,7 @@ internal static class Program
                 if (coordinator.CurrentTrack is null)
                 {
                     trackItem.Header = Loc.T("status.noTrack");
-                    tray.ToolTipText = Loc.T("tray.tooltip.version", ("version", updater.CurrentVersion.ToString()));
+                    if (tray is { } t) t.ToolTipText = Loc.T("tray.tooltip.version", ("version", updater.CurrentVersion.ToString()));
                 }
             }
             Loc.CultureChanged += ApplyMenuText;
