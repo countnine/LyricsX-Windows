@@ -18,6 +18,10 @@ public sealed class AppSettings
     private ISecretStore _secretStore = new DpapiSecretStore();
 
     public bool OverlayVisible { get; set; } = true;
+
+    /// <summary>미니창 닫기(X) 시 트레이로 숨긴다(작업표시줄에서 사라짐). 기본 꺼짐=최소화 상주.</summary>
+    public bool MiniWindowCloseToTray { get; set; }
+
     public double? OverlayX { get; set; }
     public double? OverlayY { get; set; }
 

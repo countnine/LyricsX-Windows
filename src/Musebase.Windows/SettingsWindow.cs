@@ -177,6 +177,10 @@ public sealed class SettingsWindow : Window
             general.Children.Add(Header("settings.language.header"));
             general.Children.Add(uiLangBox);
 
+            // 미니창 닫기(X) 동작: 켜면 트레이로 숨김(작업표시줄에서 사라짐), 꺼짐(기본)=최소화 상주.
+            var closeToTrayCheck = WrapCheck("settings.mini.closeToTray", settings.MiniWindowCloseToTray, new Thickness(0, 0, 0, 10));
+            general.Children.Add(closeToTrayCheck);
+
             // ---- [번역] 탭 ----
             translation.Children.Add(Header("settings.deepl.lang.header"));
             translation.Children.Add(langBox);
@@ -489,6 +493,7 @@ public sealed class SettingsWindow : Window
                 settings.LibreTranslateEndpoint = string.IsNullOrWhiteSpace(endpointBox.Text) ? null : endpointBox.Text.Trim();
                 settings.TranslationFallbackToFree = fallbackCheck.IsChecked == true;
                 settings.EnabledLyricsSources = sourceChecks.Where(s => s.Box.IsChecked == true).Select(s => s.Id).ToList();
+                settings.MiniWindowCloseToTray = closeToTrayCheck.IsChecked == true;
                 settings.TextColor = NormalizeHex(textColor.Box.Text, settings.TextColor);
                 settings.KaraokeColor = NormalizeHex(karaokeColor.Box.Text, settings.KaraokeColor);
                 settings.TranslationColor = NormalizeHex(translationColor.Box.Text, settings.TranslationColor);
