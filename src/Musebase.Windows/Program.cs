@@ -55,13 +55,7 @@ internal static class Program
                 telemetry.FlushPendingToDisk();
             };
 
-            // 재생 소스 앱 통계(클라이언트가 appId별 하루 1회로 디바운스)
-            nowPlaying.TrackChanged += t =>
-            {
-                if (t is { SourceAppId.Length: > 0 })
-                    telemetry.Track(TelemetryEvents.PlaybackSource,
-                        new Dictionary<string, object?> { ["appId"] = t.SourceAppId });
-            };
+            // 재생 소스 앱 통계는 코디네이터(엔진 계측)가 발화하고, 클라이언트가 appId별 하루 1회로 디바운스한다.
 
             // 번역: SQLite 라인 캐시 + 레지스트리에서 선택된 엔진(키 없으면 무키 무료로 폴백)
             var cacheDb = Path.Combine(
@@ -86,7 +80,8 @@ internal static class Program
 
             // 공유 조합 팩토리로 코디네이터 조립(동일 조합을 Android/서버가 재사용)
             var coordinator = LyricsEngineFactory.Create(
-                nowPlaying, new WpfEngineDispatcher(app.Dispatcher), CurrentConfig(), translationCache, Log.Write);
+                nowPlaying, new WpfEngineDispatcher(app.Dispatcher), CurrentConfig(), translationCache, Log.Write,
+                telemetry: telemetry); // 엔진 계측(lyrics_search/translation/wrong_lyrics/…) 활성화
 
             // "틀린 가사" 억제 목록을 설정에서 복원하고 변경 시 영속화
             foreach (var key in settings.SuppressedTracks) coordinator.SuppressedTrackKeys.Add(key);
