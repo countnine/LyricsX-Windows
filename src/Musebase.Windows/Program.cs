@@ -74,11 +74,11 @@ internal static class Program
                 settings.ShowOnlyTargetTranslation,
                 settings.ManualOffsetSeconds,
                 cacheDb,
-                // 폴백 켬 + 주 엔진이 libretranslate가 아닐 때만 LibreTranslate로 자동 전환.
+                // 폴백 켬 + 주 엔진이 무키 무료 기본이 아닐 때만 무료 엔진(MyMemory)으로 자동 전환.
                 TranslationFallbackEngineId:
-                    settings.TranslationFallbackToLibre
-                    && !string.Equals(settings.EffectiveTranslationEngine, "libretranslate", StringComparison.OrdinalIgnoreCase)
-                        ? "libretranslate" : null);
+                    settings.TranslationFallbackToFree
+                    && !string.Equals(settings.EffectiveTranslationEngine, Musebase.Core.Translation.TranslatorRegistry.DefaultFreeEngine, StringComparison.OrdinalIgnoreCase)
+                        ? Musebase.Core.Translation.TranslatorRegistry.DefaultFreeEngine : null);
 
             Log.Write($"[sources] 활성 가사 소스: {string.Join(", ", settings.EnabledLyricsSources)}");
             Log.Write($"[translate] 엔진={settings.EffectiveTranslationEngine}");

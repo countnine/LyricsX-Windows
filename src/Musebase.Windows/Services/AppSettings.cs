@@ -108,20 +108,21 @@ public sealed class AppSettings
     public string? LibreTranslateEndpoint { get; set; }
 
     /// <summary>
-    /// 주 번역 엔진(DeepL 등) 실패 시 LibreTranslate 공개 서버로 자동 전환한다.
-    /// 켜면 가사 텍스트가 LibreTranslate 공개 서버로 전송될 수 있다(주의). 기본 꺼짐.
+    /// 주 번역 엔진(DeepL 등) 실패 시 무키 무료 엔진(MyMemory)으로 자동 전환한다.
+    /// 켜면 가사 텍스트가 무료 번역 공개 서버로 전송될 수 있다(주의). 기본 꺼짐.
     /// </summary>
-    public bool TranslationFallbackToLibre { get; set; }
+    public bool TranslationFallbackToFree { get; set; }
 
     /// <summary>
     /// 실효 번역 엔진. 명시값이 있으면 그대로, 없으면 DeepL 키가 있으면 deepl(기존 사용자 보존),
-    /// 없으면 libretranslate(무키 무료로 설치 후 바로 동작).
+    /// 없으면 무키 무료 기본(MyMemory — 설치 후 바로 동작). LibreTranslate 공개 인스턴스가
+    /// 유료 키 필수로 바뀌어 기본 무키 엔진에서 제외했다.
     /// </summary>
     [JsonIgnore]
     public string EffectiveTranslationEngine =>
         !string.IsNullOrWhiteSpace(TranslationEngine)
             ? TranslationEngine!.Trim().ToLowerInvariant()
-            : (string.IsNullOrWhiteSpace(DeeplApiKey) ? "libretranslate" : "deepl");
+            : (string.IsNullOrWhiteSpace(DeeplApiKey) ? "mymemory" : "deepl");
 
     /// <summary>DeepL API 키(평문) — 앱 내에서만 사용, 파일엔 저장하지 않는다(암호화본만 저장).</summary>
     [JsonIgnore]
