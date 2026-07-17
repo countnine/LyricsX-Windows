@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 
@@ -23,10 +24,12 @@ public sealed class LyricsSearchService
     /// 모든 제공자 결과를 도착 순으로 스트리밍 (제공자 간 순서 비보장).
     /// 원본 검색어와 함께 정제 변형(피처링/리마스터 등 제거)도 검색해 커버리지를 넓히고,
     /// (제공자, 곡 토큰) 기준으로 중복 결과를 제거한다.
+    /// <paramref name="diagnostics"/>를 주면 소스별 히트·지연을 집계한다(텔레메트리용, 곡 정보 없음).
     /// </summary>
     public async IAsyncEnumerable<Lyrics> SearchAsync(
         LyricsSearchRequest request,
-        [EnumeratorCancellation] CancellationToken ct = default)
+        [EnumeratorCancellation] CancellationToken ct = default,
+        SearchDiagnostics? diagnostics = null)
     {
         var requests = new List<LyricsSearchRequest> { request };
         foreach (var variant in SearchTermCleaner.Variants(request.Term))
@@ -38,10 +41,17 @@ public sealed class LyricsSearchService
 
         async Task ProcessAsync(ILyricsProvider provider, LyricsSearchRequest req)
         {
+            var sw = diagnostics is null ? null : Stopwatch.StartNew();
+            var hit = false;
             try
             {
                 await foreach (var lyrics in provider.GetLyricsAsync(req, ct).ConfigureAwait(false))
                 {
+                    if (!hit)
+                    {
+                        hit = true; // 중복 제거 전 판정 — 제공자가 결과를 냈다는 사실 자체를 기록
+                        diagnostics?.ReportHit(provider.ServiceName, sw!.ElapsedMilliseconds);
+                    }
                     bool fresh;
                     lock (seenLock) fresh = seen.Add(DedupKey(lyrics));
                     if (fresh) await channel.Writer.WriteAsync(lyrics, ct).ConfigureAwait(false);
@@ -50,6 +60,10 @@ public sealed class LyricsSearchService
             catch (OperationCanceledException)
             {
                 // 취소는 조용히
+            }
+            finally
+            {
+                if (!hit) diagnostics?.ReportMiss(provider.ServiceName, sw?.ElapsedMilliseconds ?? 0);
             }
         }
 

@@ -25,15 +25,22 @@ public static class LyricsEngineFactory
 {
     /// <summary>구성·캐시로 번역 서비스를 만든다(엔진/키 변경 시 재구성용으로도 사용).</summary>
     public static LyricsTranslationService BuildTranslation(EngineConfig config, ITranslationCache cache) =>
-        new(TranslatorRegistry.Build(config.TranslationEngineId, config.TranslatorOptions), cache);
+        new(TranslatorRegistry.Build(config.TranslationEngineId, config.TranslatorOptions), cache)
+        {
+            EngineId = config.TranslationEngineId, // translation 텔레메트리의 engine 식별용
+        };
 
-    /// <summary>재생 소스·디스패처·구성으로 완전 배선된 코디네이터를 만든다.</summary>
+    /// <summary>
+    /// 재생 소스·디스패처·구성으로 완전 배선된 코디네이터를 만든다.
+    /// <paramref name="telemetry"/> 미주입(null) 시 NoopTelemetry — 수집하지 않는다(ADR-0004).
+    /// </summary>
     public static LyricsCoordinator Create(
         INowPlayingSource source,
         IEngineDispatcher dispatcher,
         EngineConfig config,
         ITranslationCache translationCache,
-        Action<string>? log = null) =>
+        Action<string>? log = null,
+        ITelemetry? telemetry = null) =>
         new(source, dispatcher, new LyricsSearchService(LyricsSourceRegistry.Build(config.EnabledLyricsSources)))
         {
             Translation = BuildTranslation(config, translationCache),
@@ -42,5 +49,6 @@ public static class LyricsEngineFactory
             ShowOnlyTargetTranslation = config.ShowOnlyTargetTranslation,
             ManualOffsetSeconds = config.ManualOffsetSeconds,
             Log = log,
+            Telemetry = telemetry ?? NoopTelemetry.Instance,
         };
 }
