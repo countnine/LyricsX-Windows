@@ -95,8 +95,8 @@ public sealed class SettingsWindow : Window
 
             // ================= 탭 패널 =================
             // 폭을 명시(SizeToContent.Height에서 폭 전파 누락으로 글자단위 줄바꿈되는 문제 방지)
-            var general = new StackPanel { Margin = new Thickness(16), MaxWidth = 428, HorizontalAlignment = HorizontalAlignment.Stretch };
-            var translation = new StackPanel { Margin = new Thickness(16), MaxWidth = 428, HorizontalAlignment = HorizontalAlignment.Stretch };
+            var general = new StackPanel { Margin = new Thickness(16), Width = 400, HorizontalAlignment = HorizontalAlignment.Left };
+            var translation = new StackPanel { Margin = new Thickness(16), Width = 400, HorizontalAlignment = HorizontalAlignment.Left };
 
             // 표시 언어
             var langChoices = new List<LanguageChoice> { new(Loc.SystemSetting, Loc.T("settings.language.system")) };
@@ -326,7 +326,7 @@ public sealed class SettingsWindow : Window
             general.Children.Add(resetIdButton);
 
             // ================= [오버레이 스타일] 탭 =================
-            var appearance = new StackPanel { Margin = new Thickness(16), MaxWidth = 428, HorizontalAlignment = HorizontalAlignment.Stretch };
+            var appearance = new StackPanel { Margin = new Thickness(16), Width = 400, HorizontalAlignment = HorizontalAlignment.Left };
 
             appearance.Children.Add(new TextBlock
             {
@@ -527,7 +527,7 @@ public sealed class SettingsWindow : Window
     /// <summary>[정보](About) 탭: 앱 이름·버전·출처·라이선스·링크·업데이트 확인.</summary>
     private StackPanel BuildAboutTab()
     {
-        var about = new StackPanel { Margin = new Thickness(16), MaxWidth = 428, HorizontalAlignment = HorizontalAlignment.Stretch };
+        var about = new StackPanel { Margin = new Thickness(16), Width = 400, HorizontalAlignment = HorizontalAlignment.Left };
 
         var v = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0, 0);
         var versionText = $"{v.Major}.{v.Minor}.{v.Build}";
