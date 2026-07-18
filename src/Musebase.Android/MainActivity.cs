@@ -40,6 +40,8 @@ public sealed class MainActivity : Activity
     // 구독 해제를 위해 델리게이트 보관
     private Action<PlaybackViewState>? _onStateChanged;
     private Action<LyricsStatus>? _onStatusChanged;
+    private Action<TranslationDisplayStatus>? _onTranslationStatusChanged;
+    private LyricsStatus _lastLyricsStatus = new(LyricsStatusKind.NoTrack); // 번역상태만 바뀔 때 재렌더용
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
@@ -111,11 +113,14 @@ public sealed class MainActivity : Activity
         if (MusebaseApp.Instance is { } app)
         {
             _onStateChanged = RenderLine;
-            _onStatusChanged = s => RenderLyricsStatus(s);
+            _onStatusChanged = s => { _lastLyricsStatus = s; RenderLyricsStatus(); };
+            _onTranslationStatusChanged = _ => RenderLyricsStatus(); // 번역 상태만 바뀌어도 소스 옆 표기 갱신
             app.Coordinator.StateChanged += _onStateChanged;
             app.Coordinator.StatusChanged += _onStatusChanged;
+            app.Coordinator.TranslationStatusChanged += _onTranslationStatusChanged;
             RenderLine(app.Coordinator.CurrentState); // 초기 스냅샷 반영
-            RenderLyricsStatus(app.LastStatus);
+            _lastLyricsStatus = app.LastStatus;
+            RenderLyricsStatus();
         }
     }
 
@@ -158,10 +163,11 @@ public sealed class MainActivity : Activity
     }
 
     /// <summary>가사 검색 상태 문구(엔진의 구조화 상태 → 간단 한국어. i18n은 다음 단계).</summary>
-    private void RenderLyricsStatus(LyricsStatus s)
+    private void RenderLyricsStatus()
     {
         if (_lyricsStatusText is null) return;
-        _lyricsStatusText.Text = s.Kind switch
+        var s = _lastLyricsStatus;
+        var baseText = s.Kind switch
         {
             LyricsStatusKind.NoTrack => "재생 중인 곡 없음",
             LyricsStatusKind.HiddenByUser => "이 곡은 틀린 가사로 표시되어 숨김",
@@ -174,6 +180,16 @@ public sealed class MainActivity : Activity
             LyricsStatusKind.Edited => "가사: 사용자 편집",
             _ => "",
         };
+        var suffix = (MusebaseApp.Instance?.Coordinator.CurrentTranslationStatus ?? TranslationDisplayStatus.None) switch
+        {
+            TranslationDisplayStatus.Translating => " · 번역: 번역 중",
+            TranslationDisplayStatus.Live => " · 번역: 정상 번역",
+            TranslationDisplayStatus.Cache => " · 번역: 캐시 이용",
+            TranslationDisplayStatus.Quota => " · 번역: 한도 초과",
+            TranslationDisplayStatus.Failed => " · 번역: 실패",
+            _ => "",
+        };
+        _lyricsStatusText.Text = baseText + suffix;
     }
 
     /// <summary>오버레이 그리기 권한 요청(시스템 설정의 "다른 앱 위에 표시" 화면으로 이동).</summary>
@@ -266,9 +282,11 @@ public sealed class MainActivity : Activity
         {
             if (_onStateChanged is not null) app.Coordinator.StateChanged -= _onStateChanged;
             if (_onStatusChanged is not null) app.Coordinator.StatusChanged -= _onStatusChanged;
+            if (_onTranslationStatusChanged is not null) app.Coordinator.TranslationStatusChanged -= _onTranslationStatusChanged;
         }
         _onStateChanged = null;
         _onStatusChanged = null;
+        _onTranslationStatusChanged = null;
         base.OnDestroy();
     }
 }

@@ -62,10 +62,11 @@ public static class LyricsEngineFactory
         ITranslationCache translationCache,
         Action<string>? log = null,
         ITelemetry? telemetry = null,
-        Action<TranslatorFailure>? onTranslationFailure = null) =>
-        new(source, dispatcher, new LyricsSearchService(LyricsSourceRegistry.Build(config.EnabledLyricsSources)))
+        Action<TranslatorFailure>? onTranslationFailure = null)
+    {
+        var coordinator = new LyricsCoordinator(
+            source, dispatcher, new LyricsSearchService(LyricsSourceRegistry.Build(config.EnabledLyricsSources)))
         {
-            Translation = BuildTranslation(config, translationCache, onTranslationFailure),
             Cache = new LyricsCacheStore(config.CacheDbPath),
             TargetLanguage = config.TargetLanguage,
             ShowOnlyTargetTranslation = config.ShowOnlyTargetTranslation,
@@ -73,4 +74,12 @@ public static class LyricsEngineFactory
             Log = log,
             Telemetry = telemetry ?? NoopTelemetry.Instance,
         };
+        // 번역기 실패를 코디네이터(번역 표시 상태 판정용)와 App(로깅·힌트) 양쪽으로 라우팅.
+        coordinator.Translation = BuildTranslation(config, translationCache, f =>
+        {
+            coordinator.RecordTranslationFailure(f);
+            onTranslationFailure?.Invoke(f);
+        });
+        return coordinator;
+    }
 }
