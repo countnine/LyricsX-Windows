@@ -5,18 +5,16 @@ using Android.OS;
 using Android.Views;
 using Android.Widget;
 using Musebase.Engine;
+using Musebase.Core;
+using System;
 
 namespace Musebase.Android;
 
 /// <summary>
-/// Phase 2 UI — 앱 내 동기 가사 표시(오버레이는 다음 단계). 하는 일:
+/// Phase 2 UI — 앱 내 동기 가사 표시(오버레이는 다음 단계).
 /// 1) 알림 접근 권한 상태 표시 + 시스템 설정으로 이동하는 버튼
-/// 2) 가사 영역: 현재 줄(크게) + 번역(아래) + 검색 상태 문구
-///    — <see cref="MusebaseApp"/>이 조립한 <see cref="LyricsCoordinator"/>의
-///    StateChanged/StatusChanged 구독으로 갱신(이벤트는 메인 스레드로 정렬돼 있다)
-/// 3) 감지된 곡명/아티스트/위치/소스앱을 1초마다 갱신 표시(스파이크 유지)
-/// 엔진·소스는 Application 소유이므로 화면 회전에도 유지되고, 이 Activity는 구독만 붙였다 뗀다.
-/// 레이아웃 리소스 없이 코드로 UI를 만들어 표면적을 최소화한다.
+/// 2) 가사 영역: 전체 가사 스크롤 뷰 + 검색 상태 문구
+/// 3) 감지된 곡명/아티스트/위치/소스앱을 1초마다 갱신 표시
 /// </summary>
 [Activity(
     Label = "Musebase",
@@ -32,8 +30,8 @@ public sealed class MainActivity : Activity
     private TextView? _overlayPermissionText;
     private Button? _overlayToggleButton;
     private TextView? _lyricsStatusText;
-    private TextView? _lineText;
-    private TextView? _translationText;
+    private ScrollView? _lyricsScrollView;
+    private LinearLayout? _lyricsContainer;
     private TextView? _statusText;
     private bool _uiLoopRunning;
 
@@ -41,7 +39,8 @@ public sealed class MainActivity : Activity
     private Action<PlaybackViewState>? _onStateChanged;
     private Action<LyricsStatus>? _onStatusChanged;
     private Action<TranslationDisplayStatus>? _onTranslationStatusChanged;
-    private LyricsStatus _lastLyricsStatus = new(LyricsStatusKind.NoTrack); // 번역상태만 바뀔 때 재렌더용
+    private LyricsStatus _lastLyricsStatus = new(LyricsStatusKind.NoTrack);
+    private string? _lastTrackKey;
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
@@ -67,65 +66,59 @@ public sealed class MainActivity : Activity
             StartActivity(new Intent(global::Android.Provider.Settings.ActionNotificationListenerSettings));
         root.AddView(permissionButton);
 
-        // ---- 오버레이(다른 앱 위 표시) ----
         _overlayPermissionText = new TextView(this);
         _overlayPermissionText.SetPadding(0, 32, 0, 0);
         root.AddView(_overlayPermissionText);
 
+        var overlayButtonLayout = new LinearLayout(this) { Orientation = Orientation.Horizontal };
         var overlayPermissionButton = new Button(this) { Text = "오버레이 권한 허용" };
         overlayPermissionButton.Click += (_, _) => RequestOverlayPermission();
-        root.AddView(overlayPermissionButton);
+        overlayButtonLayout.AddView(overlayPermissionButton);
 
         _overlayToggleButton = new Button(this) { Text = "가사 오버레이 켜기" };
         _overlayToggleButton.Click += (_, _) => ToggleOverlay();
-        root.AddView(_overlayToggleButton);
+        overlayButtonLayout.AddView(_overlayToggleButton);
+        root.AddView(overlayButtonLayout);
 
-        // ---- 번역 설정(엔진/DeepL 키/대상 언어) ----
         var settingsButton = new Button(this) { Text = "번역 설정" };
         settingsButton.Click += (_, _) => StartActivity(new Intent(this, typeof(SettingsActivity)));
         root.AddView(settingsButton);
 
-        // ---- 가사 영역 ----
-        _lyricsStatusText = new TextView(this) { Text = "가사 대기 중" };
-        _lyricsStatusText.SetTextSize(global::Android.Util.ComplexUnitType.Sp, 13f);
-        _lyricsStatusText.SetPadding(0, 48, 0, 0);
-        root.AddView(_lyricsStatusText);
-
-        _lineText = new TextView(this) { Text = "♪" };
-        _lineText.SetTextSize(global::Android.Util.ComplexUnitType.Sp, 26f);
-        _lineText.SetTypeface(Typeface.DefaultBold, TypefaceStyle.Bold);
-        _lineText.SetPadding(0, 16, 0, 0);
-        root.AddView(_lineText);
-
-        _translationText = new TextView(this) { Visibility = ViewStates.Gone };
-        _translationText.SetTextSize(global::Android.Util.ComplexUnitType.Sp, 17f);
-        _translationText.SetPadding(0, 8, 0, 0);
-        root.AddView(_translationText);
-
-        // ---- 재생 감지 정보(스파이크 유지) ----
         _statusText = new TextView(this) { Text = "감지 대기 중…" };
         _statusText.SetTextSize(global::Android.Util.ComplexUnitType.Sp, 14f);
-        _statusText.SetPadding(0, 64, 0, 0);
+        _statusText.SetPadding(0, 32, 0, 0);
         root.AddView(_statusText);
 
-        var scroll = new ScrollView(this) { FillViewport = true };
-        scroll.AddView(root, new ViewGroup.LayoutParams(
+        _lyricsStatusText = new TextView(this) { Text = "가사 대기 중" };
+        _lyricsStatusText.SetTextSize(global::Android.Util.ComplexUnitType.Sp, 13f);
+        _lyricsStatusText.SetPadding(0, 32, 0, 0);
+        root.AddView(_lyricsStatusText);
+
+        _lyricsScrollView = new ScrollView(this) { FillViewport = true };
+        _lyricsScrollView.SetPadding(0, 16, 0, 0);
+        _lyricsContainer = new LinearLayout(this) { Orientation = Orientation.Vertical };
+        _lyricsScrollView.AddView(_lyricsContainer, new ViewGroup.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
-        SetContentView(scroll, new ViewGroup.LayoutParams(
+        
+        // Let lyrics take remaining space
+        var lyricsParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0, 1f);
+        root.AddView(_lyricsScrollView, lyricsParams);
+
+        SetContentView(root, new ViewGroup.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
 
-        // ---- 엔진 구독 (조립은 MusebaseApp이 이미 완료) ----
         if (MusebaseApp.Instance is { } app)
         {
-            _onStateChanged = RenderLine;
-            _onStatusChanged = s => { _lastLyricsStatus = s; RenderLyricsStatus(); };
-            _onTranslationStatusChanged = _ => RenderLyricsStatus(); // 번역 상태만 바뀌어도 소스 옆 표기 갱신
+            _onStateChanged = RenderState;
+            _onStatusChanged = s => { _lastLyricsStatus = s; RenderLyricsStatus(); PopulateLyrics(); };
+            _onTranslationStatusChanged = _ => { RenderLyricsStatus(); PopulateLyrics(); }; 
             app.Coordinator.StateChanged += _onStateChanged;
             app.Coordinator.StatusChanged += _onStatusChanged;
             app.Coordinator.TranslationStatusChanged += _onTranslationStatusChanged;
-            RenderLine(app.Coordinator.CurrentState); // 초기 스냅샷 반영
+            RenderState(app.Coordinator.CurrentState); 
             _lastLyricsStatus = app.LastStatus;
             RenderLyricsStatus();
+            PopulateLyrics();
         }
     }
 
@@ -142,7 +135,6 @@ public sealed class MainActivity : Activity
         _handler.RemoveCallbacksAndMessages(null);
     }
 
-    /// <summary>1초마다 권한/감지 상태 텍스트 갱신.</summary>
     private void UiTick()
     {
         if (!_uiLoopRunning) return;
@@ -150,24 +142,90 @@ public sealed class MainActivity : Activity
         _handler.PostDelayed(UiTick, UiRefreshMs);
     }
 
-    /// <summary>현재 가사 줄 + 번역 갱신(StateChanged — 라인/재생상태 변화 시 발화).</summary>
-    private void RenderLine(PlaybackViewState state)
+    private void PopulateLyrics()
     {
-        if (_lineText is null || _translationText is null) return;
+        if (_lyricsContainer is null) return;
+        _lyricsContainer.RemoveAllViews();
 
-        _lineText.Text = string.IsNullOrEmpty(state.LineContent) ? "♪" : state.LineContent;
-        if (string.IsNullOrEmpty(state.LineTranslation))
+        var lyrics = MusebaseApp.Instance?.Coordinator.CurrentLyrics;
+        if (lyrics is null || lyrics.Lines.Count == 0)
         {
-            _translationText.Visibility = ViewStates.Gone;
+            var empty = new TextView(this) { Text = "♪" };
+            empty.SetTextSize(global::Android.Util.ComplexUnitType.Sp, 20f);
+            empty.SetTypeface(Typeface.DefaultBold, TypefaceStyle.Bold);
+            empty.Gravity = GravityFlags.CenterHorizontal;
+            _lyricsContainer.AddView(empty);
+            return;
         }
-        else
+
+        foreach (var line in lyrics.Lines)
         {
-            _translationText.Text = state.LineTranslation;
-            _translationText.Visibility = ViewStates.Visible;
+            var lineLayout = new LinearLayout(this) { Orientation = Orientation.Vertical };
+            lineLayout.SetPadding(0, 8, 0, 8);
+
+            var originalText = new TextView(this) { Text = line.Content };
+            originalText.SetTextSize(global::Android.Util.ComplexUnitType.Sp, 18f);
+            originalText.SetTextColor(Color.ParseColor("#DDDDDD"));
+            lineLayout.AddView(originalText);
+
+            var translation = MusebaseApp.Instance?.Coordinator.GetType().GetMethod("ResolveDisplayTranslation", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.Invoke(MusebaseApp.Instance?.Coordinator, new object[] { line.Attachments }) as string;
+            
+            if (!string.IsNullOrEmpty(translation))
+            {
+                var transText = new TextView(this) { Text = translation };
+                transText.SetTextSize(global::Android.Util.ComplexUnitType.Sp, 14f);
+                transText.SetTextColor(Color.ParseColor("#AAAAAA"));
+                lineLayout.AddView(transText);
+            }
+            
+            // Store time in tag for scrolling later
+            lineLayout.Tag = (Java.Lang.Object)(line.Position.TotalSeconds);
+            _lyricsContainer.AddView(lineLayout);
         }
     }
 
-    /// <summary>가사 검색 상태 문구(엔진의 구조화 상태 → 간단 한국어. i18n은 다음 단계).</summary>
+    private void RenderState(PlaybackViewState state)
+    {
+        var trackKey = $"{state.TrackTitle}-{state.TrackArtist}";
+        if (_lastTrackKey != trackKey)
+        {
+            _lastTrackKey = trackKey;
+            PopulateLyrics();
+        }
+
+        if (_lyricsContainer is null || _lyricsScrollView is null) return;
+        
+        // Highlight current line and scroll
+        int targetScrollY = -1;
+        for (int i = 0; i < _lyricsContainer.ChildCount; i++)
+        {
+            var child = _lyricsContainer.GetChildAt(i) as LinearLayout;
+            if (child is null) continue;
+            
+            var originalText = child.GetChildAt(0) as TextView;
+            if (originalText is null) continue;
+
+            if (originalText.Text == state.LineContent)
+            {
+                originalText.SetTextColor(Color.White);
+                originalText.SetTypeface(Typeface.DefaultBold, TypefaceStyle.Bold);
+                targetScrollY = child.Top;
+            }
+            else
+            {
+                originalText.SetTextColor(Color.ParseColor("#DDDDDD"));
+                originalText.SetTypeface(Typeface.Default, TypefaceStyle.Normal);
+            }
+        }
+        
+        if (targetScrollY >= 0)
+        {
+            _lyricsScrollView.Post(() => {
+                _lyricsScrollView.SmoothScrollTo(0, targetScrollY - _lyricsScrollView.Height / 2 + 100);
+            });
+        }
+    }
+
     private void RenderLyricsStatus()
     {
         if (_lyricsStatusText is null) return;
@@ -197,7 +255,6 @@ public sealed class MainActivity : Activity
         _lyricsStatusText.Text = baseText + suffix;
     }
 
-    /// <summary>오버레이 그리기 권한 요청(시스템 설정의 "다른 앱 위에 표시" 화면으로 이동).</summary>
     private void RequestOverlayPermission()
     {
         if (global::Android.Provider.Settings.CanDrawOverlays(this)) return;
@@ -206,7 +263,6 @@ public sealed class MainActivity : Activity
             global::Android.Net.Uri.Parse("package:" + PackageName)));
     }
 
-    /// <summary>오버레이 서비스 시작/중지 토글. 권한 없으면 권한 화면으로 유도.</summary>
     private void ToggleOverlay()
     {
         if (Services.OverlayService.IsRunning)
@@ -228,7 +284,6 @@ public sealed class MainActivity : Activity
         UpdateOverlayControls();
     }
 
-    /// <summary>오버레이 권한 상태 문구 + 토글 버튼 라벨을 현재 상태로 갱신.</summary>
     private void UpdateOverlayControls()
     {
         if (_overlayPermissionText is not null)
@@ -271,9 +326,7 @@ public sealed class MainActivity : Activity
         _statusText.Text =
             $"곡명: {track.Title}\n" +
             $"아티스트: {track.Artist}\n" +
-            $"앨범: {track.Album}\n" +
             $"위치: {Format(position)} / {Format(track.Duration)}\n" +
-            $"상태: {(source.IsPlaying ? "재생 중" : "일시정지")}\n" +
             $"소스 앱: {track.SourceAppId}";
     }
 
@@ -295,3 +348,4 @@ public sealed class MainActivity : Activity
         base.OnDestroy();
     }
 }
+
